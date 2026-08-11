@@ -117,6 +117,8 @@ MANIFEST_VERSION="$(node -e 'const m = require(process.argv[1]); process.stdout.
 MANIFEST_IMPORT_TYPE="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.importType))' "$SOURCE_ROOT/manifest.json")"
 MANIFEST_TYPE="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.type))' "$SOURCE_ROOT/manifest.json")"
 MANIFEST_PROVIDER="$(node -e 'const m = require(process.argv[1]); process.stdout.write(typeof m.provider === "object" && m.provider !== null ? JSON.stringify({ value: m.provider.value, label: m.provider.label }) : "invalid")' "$SOURCE_ROOT/manifest.json")"
+MANIFEST_PLATFORMS="$(node -e 'const m = require(process.argv[1]); process.stdout.write(JSON.stringify(m.platforms))' "$SOURCE_ROOT/manifest.json")"
+MANIFEST_ARCH="$(node -e 'const m = require(process.argv[1]); process.stdout.write(JSON.stringify(m.arch))' "$SOURCE_ROOT/manifest.json")"
 if [[ "$MANIFEST_PLUGIN_ID" != "$PLUGIN_ID" ]]; then
   echo "build-memox: manifest pluginId mismatch: $MANIFEST_PLUGIN_ID" >&2
   exit 1
@@ -135,6 +137,14 @@ if [[ "$MANIFEST_IMPORT_TYPE" != "commonjs" ]]; then
 fi
 if [[ "$MANIFEST_TYPE" != "tts" ]]; then
   echo "build-memox: manifest type must be tts: $MANIFEST_TYPE" >&2
+  exit 1
+fi
+if [[ "$MANIFEST_PLATFORMS" != '["darwin"]' ]]; then
+  echo "build-memox: manifest platforms must be exactly [darwin]: $MANIFEST_PLATFORMS" >&2
+  exit 1
+fi
+if [[ "$MANIFEST_ARCH" != '["arm64"]' ]]; then
+  echo "build-memox: manifest arch must be exactly [arm64]: $MANIFEST_ARCH" >&2
   exit 1
 fi
 if [[ "$MANIFEST_PROVIDER" == "invalid" ]]; then

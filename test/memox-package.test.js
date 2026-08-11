@@ -425,6 +425,35 @@ test("manifest type and provider shape are strictly validated", { timeout: 30000
   assert.match(blankRun.stderr, /manifest|provider/i);
 });
 
+test("manifest platforms and arch must be exact contract arrays", { timeout: 30000 }, () => {
+  const cases = [
+    { key: "platforms", value: ["win32"], match: /manifest|platform/i },
+    { key: "platforms", value: ["darwin", "win32"], match: /manifest|platform/i },
+    { key: "platforms", value: [], match: /manifest|platform/i },
+    { key: "platforms", value: "darwin", match: /manifest|platform/i },
+    { key: "arch", value: ["x64"], match: /manifest|arch/i },
+    { key: "arch", value: ["arm64", "x64"], match: /manifest|arch/i },
+    { key: "arch", value: [], match: /manifest|arch/i },
+    { key: "arch", value: "arm64", match: /manifest|arch/i },
+  ];
+  for (const entry of cases) {
+    const out = makeOutputDir();
+    const root = makeSourceFixture();
+    const manifestPath = path.join(root, "manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    manifest[entry.key] = entry.value;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const result = runFixtureBuild(root, out);
+    assert.notEqual(result.status, 0, `${entry.key}=${JSON.stringify(entry.value)} must be rejected`);
+    assert.match(result.stderr, entry.match, `${entry.key}=${JSON.stringify(entry.value)} wrong error`);
+    assert.equal(
+      fs.existsSync(path.join(out, ARTIFACT_NAME)),
+      false,
+      `${entry.key}=${JSON.stringify(entry.value)} must not publish an artifact`,
+    );
+  }
+});
+
 test("artifact or sidecar directory collision is rejected before publishing", { timeout: 30000 }, () => {
   const out = makeOutputDir();
   fs.mkdirSync(path.join(out, ARTIFACT_NAME), { recursive: true });
