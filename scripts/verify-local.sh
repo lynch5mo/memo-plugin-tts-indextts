@@ -22,8 +22,27 @@ if [[ -z "$ROOT" || -z "$PLUGIN_VERSION" ]]; then
   usage
   exit 2
 fi
+if [[ -z "$ROOT" || "$ROOT" == "/" ]]; then
+  echo "verify-local: invalid root: $ROOT" >&2
+  exit 2
+fi
+if [[ ! "$PLUGIN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "verify-local: invalid plugin version: $PLUGIN_VERSION" >&2
+  exit 2
+fi
 
 PLUGIN_DIR="$ROOT/plugins/$PLUGIN_ID@$PLUGIN_VERSION"
+if [[ ! -d "$ROOT" ]]; then
+  echo "verify-local: root directory does not exist: $ROOT" >&2
+  exit 2
+fi
+ROOT="$(cd "$ROOT" && pwd -P)"
+PLUGIN_DIR="$ROOT/plugins/$PLUGIN_ID@$PLUGIN_VERSION"
+if [[ "$PLUGIN_DIR" != "$(cd "$ROOT" && pwd -P)/plugins/$PLUGIN_ID@$PLUGIN_VERSION" ]]; then
+  echo "verify-local: plugin path escapes root: $PLUGIN_DIR" >&2
+  exit 2
+fi
+
 EXPECTED_FILES=(
   "index.js"
   "lib/audio.js"
@@ -40,6 +59,20 @@ for file in "${EXPECTED_FILES[@]}"; do
   fi
 done
 
+while IFS= read -r -d '' found; do
+  if [[ -L "$found" ]]; then
+    echo "verify-local: symlink found: $found" >&2
+    exit 1
+  fi
+done < <(find "$PLUGIN_DIR" -print0)
+
+actual_files="$(cd "$PLUGIN_DIR" && find . -type f | sed 's#^\./##' | sort)"
+expected_files="$(printf '%s\n' "${EXPECTED_FILES[@]}" | sort)"
+if [[ "$actual_files" != "$expected_files" ]]; then
+  echo "verify-local: plugin dir contains unexpected or missing files" >&2
+  exit 1
+fi
+
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 for file in "${EXPECTED_FILES[@]}"; do
   source_hash="$(shasum -a 256 "$SOURCE_ROOT/$file" | awk '{print $1}')"
@@ -50,8 +83,8 @@ for file in "${EXPECTED_FILES[@]}"; do
   fi
 done
 
-MANIFEST_PLUGIN_ID="$(node -p "require('$PLUGIN_DIR/manifest.json').pluginId")"
-MANIFEST_VERSION="$(node -p "require('$PLUGIN_DIR/manifest.json').version")"
+MANIFEST_PLUGIN_ID="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.pluginId))' "$PLUGIN_DIR/manifest.json")"
+MANIFEST_VERSION="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.version))' "$PLUGIN_DIR/manifest.json")"
 if [[ "$MANIFEST_PLUGIN_ID" != "$PLUGIN_ID" ]]; then
   echo "verify-local: manifest pluginId mismatch: $MANIFEST_PLUGIN_ID" >&2
   exit 1
@@ -61,16 +94,33 @@ if [[ "$MANIFEST_VERSION" != "$PLUGIN_VERSION" ]]; then
   exit 1
 fi
 
-node -e "
-const TTS = require('$PLUGIN_DIR/index.js').default;
-if (typeof TTS !== 'function') throw new Error('default export is not a constructor');
-new TTS().textToSpeech({ text: '' }).then((buffer) => {
-  if (!Buffer.isBuffer(buffer)) throw new Error('textToSpeech did not return a Buffer');
-  if (buffer.toString('ascii', 0, 4) !== 'RIFF') throw new Error('not a RIFF WAV');
-  if (buffer.length !== 44 + 3200 * 2) throw new Error('unexpected WAV length');
-  console.log('verify-local: require contract OK');
+node -e '
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+const pluginDir = process.argv[1];
+const result = spawnSync(process.execPath, ["-e", `
+const TTS = require(process.argv[1]).default;
+if (typeof TTS !== "function") throw new Error("default export is not a constructor");
+new TTS().textToSpeech({ text: "" }).then((buffer) => {
+  if (!Buffer.isBuffer(buffer)) throw new Error("textToSpeech did not return a Buffer");
+  if (buffer.toString("ascii", 0, 4) !== "RIFF") throw new Error("not a RIFF WAV");
+  if (buffer.toString("ascii", 8, 12) !== "WAVE") throw new Error("missing WAVE chunk");
+  if (buffer.readUInt32LE(24) !== 32000) throw new Error("sample rate mismatch");
+  if (buffer.readUInt16LE(22) !== 1) throw new Error("channel mismatch");
+  if (buffer.readUInt16LE(34) !== 16) throw new Error("bits per sample mismatch");
+  if (buffer.length !== 44 + 3200 * 2) throw new Error("unexpected WAV length");
+  for (let i = 44; i < buffer.length; i++) {
+    if (buffer[i] !== 0) throw new Error("PCM data is not silent");
+  }
+  console.log("verify-local: require contract OK");
 }).catch((error) => {
-  console.error('verify-local: require contract failed:', error.message);
+  console.error("verify-local: require contract failed:", error.message);
   process.exit(1);
 });
-"
+`, path.join(pluginDir, "index.js")], { encoding: "utf8", timeout: 15000 });
+if (result.status !== 0) {
+  process.stderr.write(result.stderr || "");
+  process.exit(result.status || 1);
+}
+process.stdout.write(result.stdout || "");
+' "$PLUGIN_DIR"
