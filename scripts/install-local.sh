@@ -40,7 +40,19 @@ if [[ ! -d "$ROOT" ]]; then
 fi
 ROOT="$(cd "$ROOT" && pwd -P)"
 
-if [[ "$ROOT" == "$(cd "$REAL_MEMO_ROOT" && pwd -P)" ]]; then
+IS_REAL_MEMO_ROOT="$(node -e '
+const fs = require("node:fs");
+const candidate = process.argv[1];
+const real = process.argv[2];
+try {
+  const c = fs.statSync(candidate);
+  const r = fs.statSync(real);
+  process.stdout.write(c.dev === r.dev && c.ino === r.ino ? "same" : "different");
+} catch {
+  process.stdout.write("different");
+}
+' "$ROOT" "$REAL_MEMO_ROOT")"
+if [[ "$IS_REAL_MEMO_ROOT" == "same" ]]; then
   echo "install-local: direct installation to the real Memo root is unsupported; use the approved Memo-owned .memox flow instead" >&2
   exit 3
 fi

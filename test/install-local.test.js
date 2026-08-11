@@ -119,6 +119,32 @@ test("real canonical Memo root is always rejected read-only", { timeout: 20000 }
   }
 });
 
+test("real Memo root filesystem aliases are rejected before staging is created", { timeout: 20000 }, () => {
+  const realRoot = path.join(os.homedir(), "Library", "Application Support", "Memo");
+  if (!fs.existsSync(realRoot)) {
+    return;
+  }
+  const before = fs.readdirSync(realRoot).sort();
+  const aliases = new Set();
+  aliases.add(path.join(os.homedir(), "Library", "Application Support", "memo"));
+  const symlinkParent = fs.mkdtempSync(path.join(os.tmpdir(), "memo-real-alias-"));
+  const symlinkAlias = path.join(symlinkParent, "MemoAlias");
+  try {
+    fs.symlinkSync(realRoot, symlinkAlias, "dir");
+    aliases.add(symlinkAlias);
+  } catch {}
+  for (const alias of aliases) {
+    if (!fs.existsSync(alias)) continue;
+    for (const env of [{ INSTALL_TEST_ROOT: "" }, { INSTALL_TEST_ROOT: "1" }]) {
+      const result = run(INSTALL, ["--root", alias, "--run-id", "legal-run"], env);
+      assert.notEqual(result.status, 0, alias + " must be rejected");
+      assert.match(result.stderr, /direct installation to the real Memo root is unsupported/i);
+    }
+    assert.equal(fs.existsSync(path.join(realRoot, "plugin-staging", "legal-run")), false);
+    assert.deepEqual(fs.readdirSync(realRoot).sort(), before);
+  }
+});
+
 test("fake Memo command line is irrelevant to a temp-root install", { timeout: 25000 }, async () => {
   const root = makeRoot();
   const fake = path.join(root, "Memo.app.fake");
