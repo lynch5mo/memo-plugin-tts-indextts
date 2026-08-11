@@ -7,7 +7,8 @@
 - manifest 只声明 Phase 0 所需 provider、语言、语速与静态 Gate 配置。
 - `manifest.json`、`i18n.json`、`options.json` 可解析，manifest 契约测试通过。
 - 最小 CommonJS 运行时入口 `index.js`（自包含）：`textToSpeech()` 返回 32kHz/16-bit/单声道/100ms 静音 WAV `Buffer`（Phase 0 占位，非真实 TTS）。
-- 状态：Task 0 已验证；Task 1 运行时契约测试 GREEN，真实 Memo 发现/调用未验证。
+- 状态：Task 0 已验证；Task 1/1A 运行时契约、打包安全与宿主 NodeVM 加载测试 GREEN；
+  真实 Memo 可安装并登记插件，但 Temo 无法选择第三方 TTS provider。
 
 ## 安装安全契约（Task 1）
 
@@ -17,16 +18,21 @@
 
 ## Gate A 结果：STOPPED_AT_GATE_A
 
-- 真实 Memo 1.7.5 direct-directory discovery **FAIL**：重启后“设置 → 语音合成”与“三方集成 → 语音合成”均无 GPT-SoVITS，`plugins/index.json` 无本插件条目且 SHA 未变，`app.asar` 未改。
-- 宿主只接受 Memo 自有导入格式：`.memox` 或 application/zip；TTS 页无 Import 按钮但 drop zone 接受该格式；main `installPlugins` 会解包、读 manifest、移动到版本目录并由 Memo 自身写 `index.json`。
-- 本任务不得手工写 `plugins/index.json` 绕过；真实安装已回滚到 `plugin-backups/memo-plugin-tts-gptsovits/`。
-- 后续需要用户批准新增“本地打包/.memox 安装契约”任务后再继续；本 Task 不实现该打包任务。
+- `.memox` 已由 Memo 1.7.5 原生导入接受，Memo 自身创建版本目录并登记
+  `plugins/index.json`；「三方集成 → 语音合成」显示 GPT-SoVITS TTS。
+- 独立 Temo「文本转语音」服务下拉框只显示 Edge 与 Volcengine；根因是 Temo 前端
+  硬编码 TTS provider 白名单（`edge`、`volcengine`），没有第三方 TTS 扩展入口。
+- 当前插件不是可用的 GPT-SoVITS 合成实现；禁止伪装 provider/pluginId/label 绕过
+  白名单，禁止修改 Memo 前端资产、`app.asar` 或手工写 `plugins/index.json`。
+- 解锁需要 Memo/Temo 新版本移除该过滤，或提供正式第三方 TTS allowlist/扩展接口；
+  宿主能力更新后按本节重新执行 Gate A 验收。
 
 ## Gate B — 本地服务与运行时发现
 
 - 验证 GPT-SoVITS `127.0.0.1:9880` 的 `/openapi.json` 存在 `POST /tts`。
 - 验证 Memo 能发现并加载插件。
-- 状态：端口 OpenAPI 已验证；Memo runtime 发现未验证。
+- 状态：端口 OpenAPI 已验证；Memo 能登记并加载插件目录，但 Temo 服务列表未开放
+  第三方 TTS provider。
 
 ## Gate C — 真实 TTS 调用
 

@@ -1,6 +1,8 @@
 {
   "name": "memo-plugin-tts-gptsovits",
   "version": "1.0.0",
+  "description": "Phase 0 GPT-SoVITS TTS provider for Memo with a deterministic local .memox builder",
+  "license": "MIT",
   "private": true,
   "type": "commonjs",
   "scripts": {
