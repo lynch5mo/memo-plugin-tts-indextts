@@ -65,7 +65,6 @@ fi
 
 EXPECTED_FILES=(
   "index.js"
-  "lib/audio.js"
   "manifest.json"
   "i18n.json"
   "options.json"

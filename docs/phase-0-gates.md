@@ -6,7 +6,7 @@
 
 - manifest 只声明 Phase 0 所需 provider、语言、语速与静态 Gate 配置。
 - `manifest.json`、`i18n.json`、`options.json` 可解析，manifest 契约测试通过。
-- 最小 CommonJS 运行时入口 `index.js` 与 `lib/audio.js`：`textToSpeech()` 返回 32kHz/16-bit/单声道/100ms 静音 WAV `Buffer`（Phase 0 占位，非真实 TTS）。
+- 最小 CommonJS 运行时入口 `index.js`（自包含）：`textToSpeech()` 返回 32kHz/16-bit/单声道/100ms 静音 WAV `Buffer`（Phase 0 占位，非真实 TTS）。
 - 状态：Task 0 已验证；Task 1 运行时契约测试 GREEN，真实 Memo 发现/调用未验证。
 
 ## 安装安全契约（Task 1）

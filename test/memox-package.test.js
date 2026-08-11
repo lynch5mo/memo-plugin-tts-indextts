@@ -18,7 +18,6 @@ const SIDE_CAR_NAME = `${ARTIFACT_NAME}.sha256`;
 const RUNTIME_FILES = [
   "manifest.json",
   "index.js",
-  "lib/audio.js",
   "i18n.json",
   "options.json",
   "icon.svg",
@@ -40,7 +39,7 @@ function dosDateTime(year, month, day, hour, minute, second) {
 }
 
 function makeOutputDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "memo-memox-out-"));
+  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "memo-memox-out-")));
 }
 
 function runBuild(outputDir, env = {}) {
@@ -348,6 +347,100 @@ test("package extracts and loads as the existing CommonJS provider", { timeout: 
   assert.equal(buffer.length, 44 + 3200 * 2);
 });
 
+test("packaged index.js is self-contained and has no relative require", { timeout: 30000 }, () => {
+  const out = makeOutputDir();
+  const built = runBuild(out);
+  assert.equal(built.status, 0, built.stderr);
+  const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), "memo-memox-no-rel-"));
+  const unpacked = extract(path.join(out, ARTIFACT_NAME), extractDir);
+  assert.equal(unpacked.status, 0, unpacked.stderr);
+  const entry = fs.readFileSync(path.join(extractDir, "index.js"), "utf8");
+  assert.doesNotMatch(entry, /require\s*\(\s*["']\./, "packaged index.js must not require relative modules");
+  const TTS = require(path.join(extractDir, "index.js")).default;
+  assert.equal(typeof TTS, "function");
+});
+
+test("existing symlink component in output path is rejected", { timeout: 30000 }, () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "memo-memox-exist-sym-"));
+  const real = path.join(parent, "real");
+  const alias = path.join(parent, "alias");
+  fs.mkdirSync(real, { recursive: true });
+  fs.mkdirSync(path.join(real, "sub"), { recursive: true });
+  fs.symlinkSync(real, alias, "dir");
+  const outputDir = path.join(alias, "sub");
+  const result = runBuild(outputDir);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /symlink/i);
+  assert.equal(
+    fs.existsSync(path.join(real, "sub", ARTIFACT_NAME)),
+    false,
+    "artifact must not be written through the symlink component",
+  );
+});
+
+test("source file mode 0755 still produces zip entries with mode 0644", { timeout: 30000 }, () => {
+  const root = makeSourceFixture();
+  fs.chmodSync(path.join(root, "index.js"), 0o755);
+  const out = makeOutputDir();
+  const built = runFixtureBuild(root, out);
+  assert.equal(built.status, 0, built.stderr);
+  const entries = readZipEntries(path.join(out, ARTIFACT_NAME));
+  const indexEntry = entries.find((entry) => entry.name === "index.js");
+  assert.ok(indexEntry, "index.js entry missing");
+  assert.equal(indexEntry.mode & 0o777, 0o644, "zip entry must be 0644 regardless of source mode");
+});
+
+test("manifest type and provider shape are strictly validated", { timeout: 30000 }, () => {
+  const out = makeOutputDir();
+
+  const badType = makeSourceFixture();
+  const typeManifest = JSON.parse(
+    fs.readFileSync(path.join(badType, "manifest.json"), "utf8"),
+  );
+  typeManifest.type = "llm";
+  fs.writeFileSync(path.join(badType, "manifest.json"), JSON.stringify(typeManifest));
+  const badTypeRun = runFixtureBuild(badType, out);
+  assert.notEqual(badTypeRun.status, 0);
+  assert.match(badTypeRun.stderr, /manifest|type/i);
+  assert.equal(fs.existsSync(path.join(out, ARTIFACT_NAME)), false);
+
+  const noProvider = makeSourceFixture();
+  const noProviderManifest = JSON.parse(
+    fs.readFileSync(path.join(noProvider, "manifest.json"), "utf8"),
+  );
+  delete noProviderManifest.provider;
+  fs.writeFileSync(path.join(noProvider, "manifest.json"), JSON.stringify(noProviderManifest));
+  const noProviderRun = runFixtureBuild(noProvider, out);
+  assert.notEqual(noProviderRun.status, 0);
+  assert.match(noProviderRun.stderr, /manifest|provider/i);
+
+  const blankProvider = makeSourceFixture();
+  const blankManifest = JSON.parse(
+    fs.readFileSync(path.join(blankProvider, "manifest.json"), "utf8"),
+  );
+  blankManifest.provider = { value: "", label: "GPT-SoVITS TTS" };
+  fs.writeFileSync(path.join(blankProvider, "manifest.json"), JSON.stringify(blankManifest));
+  const blankRun = runFixtureBuild(blankProvider, out);
+  assert.notEqual(blankRun.status, 0);
+  assert.match(blankRun.stderr, /manifest|provider/i);
+});
+
+test("artifact or sidecar directory collision is rejected before publishing", { timeout: 30000 }, () => {
+  const out = makeOutputDir();
+  fs.mkdirSync(path.join(out, ARTIFACT_NAME), { recursive: true });
+  const result = runBuild(out);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /artifact|sidecar|regular file/i);
+  assert.equal(fs.existsSync(path.join(out, ARTIFACT_NAME, "index.js")), false, "artifact dir must not receive the zip");
+
+  const out2 = makeOutputDir();
+  fs.mkdirSync(path.join(out2, SIDE_CAR_NAME), { recursive: true });
+  const result2 = runBuild(out2);
+  assert.notEqual(result2.status, 0);
+  assert.match(result2.stderr, /artifact|sidecar|regular file/i);
+  assert.equal(fs.existsSync(path.join(out2, SIDE_CAR_NAME, "sidecar")), false, "sidecar dir must not receive the hash");
+});
+
 test("rejects unsafe output directories without publishing artifacts", { timeout: 30000 }, () => {
   const cases = [];
 
@@ -376,6 +469,7 @@ test("rejects unsafe output directories without publishing artifacts", { timeout
   fs.mkdirSync(nestedReal, { recursive: true });
   const nestedLink = path.join(parent, "nested-link");
   fs.symlinkSync(nestedReal, nestedLink, "dir");
+  fs.mkdirSync(path.join(nestedReal, "sub"), { recursive: true });
   cases.push({
     name: "output dir symlink component",
     outputDir: path.join(nestedLink, "sub"),
@@ -453,7 +547,10 @@ test("rejects malicious manifests and incomplete or symlinked sources", { timeou
   assert.equal(fs.existsSync(path.join(out, ARTIFACT_NAME)), false);
 });
 
-test("crafted malicious archives are rejected by the package safety rules", { timeout: 30000 }, () => {
+test("crafted malicious archive policy fixtures match the intended entry policy", { timeout: 30000 }, () => {
+  // Policy fixtures only, not production validation: they exercise this test's
+  // own reader so the host unpacker remains the authoritative safety boundary.
+  // Production build validation is covered by the actual-artifact tests.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "memo-memox-evil-"));
   const fixtures = [
     {

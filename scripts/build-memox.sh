@@ -9,7 +9,6 @@ FIXED_MTIME="202601010000"
 RUNTIME_FILES=(
   "manifest.json"
   "index.js"
-  "lib/audio.js"
   "i18n.json"
   "options.json"
   "icon.svg"
@@ -46,48 +45,49 @@ OUT_STATE="$(node -e '
 const fs = require("node:fs");
 const path = require("node:path");
 const out = path.resolve(process.argv[1]);
-if (out === path.dirname(out)) {
-  process.stdout.write("bad");
-  process.exit(0);
-}
 const lstat = (p) => {
   try {
-    return fs.lstatSync(p).isSymbolicLink();
+    return fs.lstatSync(p);
   } catch {
-    return false;
+    return null;
   }
 };
 let probe = out;
 while (!fs.existsSync(probe) && probe !== path.dirname(probe)) {
   probe = path.dirname(probe);
 }
-if (lstat(probe)) {
+if (probe !== out && lstat(probe)?.isSymbolicLink()) {
   process.stdout.write("symlink");
   process.exit(0);
 }
-if (fs.existsSync(probe) && !fs.statSync(probe).isDirectory()) {
-  process.stdout.write("notdir");
-  process.exit(0);
-}
 if (probe !== out) {
-  const anchor = fs.realpathSync(probe);
-  const rel = path.relative(probe, out);
-  let current = anchor;
-  for (const part of rel.split(path.sep)) {
+  const anchor = path.parse(out).root;
+  const relative = path.relative(probe, out);
+  const parts = relative.split(path.sep).filter((part) => part.length > 0);
+  let current = probe;
+  for (const part of parts) {
     current = path.join(current, part);
-    if (lstat(current)) {
+    if (lstat(current)?.isSymbolicLink()) {
       process.stdout.write("symlink");
-      process.exit(0);
-    }
-    if (!fs.existsSync(current)) {
-      process.stdout.write("missing");
       process.exit(0);
     }
   }
   process.stdout.write("missing");
   process.exit(0);
 }
-process.stdout.write(fs.realpathSync(out) === fs.realpathSync(probe) ? "ok" : "symlink");
+if (lstat(out)?.isSymbolicLink()) {
+  process.stdout.write("symlink");
+  process.exit(0);
+}
+if (!fs.statSync(out).isDirectory()) {
+  process.stdout.write("notdir");
+  process.exit(0);
+}
+if (path.resolve(out) !== fs.realpathSync(out)) {
+  process.stdout.write("symlink");
+  process.exit(0);
+}
+process.stdout.write("ok");
 ' "$OUT")"
 if [[ "$OUT_STATE" == "symlink" ]]; then
   echo "build-memox: output directory is or contains a symlink: $OUT" >&2
@@ -107,7 +107,7 @@ if [[ "$OUT_STATE" != "ok" ]]; then
 fi
 REAL_OUT="$(cd "$OUT" && pwd -P)"
 
-if [[ ! -f "$SOURCE_ROOT/manifest.json" || ! -f "$SOURCE_ROOT/index.js" || ! -f "$SOURCE_ROOT/lib/audio.js" ]]; then
+if [[ ! -f "$SOURCE_ROOT/manifest.json" || ! -f "$SOURCE_ROOT/index.js" ]]; then
   echo "build-memox: source root is incomplete: $SOURCE_ROOT" >&2
   exit 1
 fi
@@ -115,6 +115,8 @@ fi
 MANIFEST_PLUGIN_ID="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.pluginId))' "$SOURCE_ROOT/manifest.json")"
 MANIFEST_VERSION="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.version))' "$SOURCE_ROOT/manifest.json")"
 MANIFEST_IMPORT_TYPE="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.importType))' "$SOURCE_ROOT/manifest.json")"
+MANIFEST_TYPE="$(node -e 'const m = require(process.argv[1]); process.stdout.write(String(m.type))' "$SOURCE_ROOT/manifest.json")"
+MANIFEST_PROVIDER="$(node -e 'const m = require(process.argv[1]); process.stdout.write(typeof m.provider === "object" && m.provider !== null ? JSON.stringify({ value: m.provider.value, label: m.provider.label }) : "invalid")' "$SOURCE_ROOT/manifest.json")"
 if [[ "$MANIFEST_PLUGIN_ID" != "$PLUGIN_ID" ]]; then
   echo "build-memox: manifest pluginId mismatch: $MANIFEST_PLUGIN_ID" >&2
   exit 1
@@ -131,11 +133,25 @@ if [[ "$MANIFEST_IMPORT_TYPE" != "commonjs" ]]; then
   echo "build-memox: manifest importType must be commonjs: $MANIFEST_IMPORT_TYPE" >&2
   exit 1
 fi
-
-if [[ -L "$SOURCE_ROOT/lib" ]]; then
-  echo "build-memox: source lib is a symlink" >&2
+if [[ "$MANIFEST_TYPE" != "tts" ]]; then
+  echo "build-memox: manifest type must be tts: $MANIFEST_TYPE" >&2
   exit 1
 fi
+if [[ "$MANIFEST_PROVIDER" == "invalid" ]]; then
+  echo "build-memox: manifest provider must be an object with non-empty value/label" >&2
+  exit 1
+fi
+MANIFEST_PROVIDER_VALUE="$(node -e 'const m = JSON.parse(process.argv[1]); process.stdout.write(String(m.value))' "$MANIFEST_PROVIDER")"
+MANIFEST_PROVIDER_LABEL="$(node -e 'const m = JSON.parse(process.argv[1]); process.stdout.write(String(m.label))' "$MANIFEST_PROVIDER")"
+if [[ -z "$MANIFEST_PROVIDER_VALUE" || -z "$MANIFEST_PROVIDER_LABEL" ]]; then
+  echo "build-memox: manifest provider value/label must be non-empty" >&2
+  exit 1
+fi
+if [[ "$MANIFEST_PROVIDER_VALUE" != "GPT-SoVITS TTS" || "$MANIFEST_PROVIDER_LABEL" != "GPT-SoVITS TTS" ]]; then
+  echo "build-memox: manifest provider value/label must match the expected provider" >&2
+  exit 1
+fi
+
 for file in "${RUNTIME_FILES[@]}"; do
   if [[ ! -f "$SOURCE_ROOT/$file" ]]; then
     echo "build-memox: missing runtime file: $file" >&2
@@ -153,6 +169,7 @@ trap 'rm -rf "$STAGE"' EXIT
 for file in "${RUNTIME_FILES[@]}"; do
   mkdir -p "$(dirname "$STAGE/$file")"
   cp "$SOURCE_ROOT/$file" "$STAGE/$file"
+  chmod 0644 "$STAGE/$file"
   touch -t "$FIXED_MTIME" "$STAGE/$file"
 done
 
@@ -188,7 +205,25 @@ if [[ "${MEMOX_BUILD_SIMULATE_FINAL_MOVE_FAILURE:-}" == "1" ]]; then
   exit 1
 fi
 
+for target in "$REAL_OUT/$ARTIFACT_NAME" "$REAL_OUT/$SIDE_CAR_NAME"; do
+  if [[ -L "$target" || -e "$target" ]] && [[ ! -f "$target" || -L "$target" ]]; then
+    echo "build-memox: output target is not a regular file: $target" >&2
+    exit 1
+  fi
+done
+
 (cd "$STAGE" && shasum -a 256 "$ARTIFACT_NAME") > "$STAGE/$SIDE_CAR_NAME"
+if [[ -f "$REAL_OUT/$ARTIFACT_NAME" ]]; then
+  cp "$REAL_OUT/$ARTIFACT_NAME" "$STAGE/old-$ARTIFACT_NAME"
+fi
 mv "$STAGE/$ARTIFACT_NAME" "$REAL_OUT/$ARTIFACT_NAME"
-mv "$STAGE/$SIDE_CAR_NAME" "$REAL_OUT/$SIDE_CAR_NAME"
+if ! mv "$STAGE/$SIDE_CAR_NAME" "$REAL_OUT/$SIDE_CAR_NAME"; then
+  echo "build-memox: sidecar publish failed; restoring previous artifact" >&2
+  if [[ -f "$STAGE/old-$ARTIFACT_NAME" ]]; then
+    mv "$STAGE/old-$ARTIFACT_NAME" "$REAL_OUT/$ARTIFACT_NAME"
+  else
+    rm -f "$REAL_OUT/$ARTIFACT_NAME"
+  fi
+  exit 1
+fi
 echo "build-memox: wrote $REAL_OUT/$ARTIFACT_NAME"

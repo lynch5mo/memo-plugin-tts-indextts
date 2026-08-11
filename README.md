@@ -6,7 +6,7 @@ Phase 0 最小 GPT-SoVITS TTS provider 插件（静音 WAV 占位，非真实 TT
 当前范围：
 
 - Memo TTS 插件 manifest 契约（`manifest.json`）
-- CommonJS 运行时入口（`index.js` + `lib/audio.js`）：`textToSpeech()` 返回
+- CommonJS 运行时入口（`index.js` 自包含）：`textToSpeech()` 返回
   32kHz/16-bit/单声道/100ms 静音 WAV `Buffer`
 - 中英文静态文案（`i18n.json`）与静态语言选项（`options.json`）
 - 自有 SVG 图标（`icon.svg`，无第三方商标素材）

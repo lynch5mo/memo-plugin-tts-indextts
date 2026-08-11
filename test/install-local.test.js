@@ -14,7 +14,6 @@ const PLUGIN_DIR = `${PLUGIN_ID}@${PLUGIN_VERSION}`;
 const EXPECTED_FILES = [
   "manifest.json",
   "index.js",
-  "lib/audio.js",
   "i18n.json",
   "options.json",
   "icon.svg",

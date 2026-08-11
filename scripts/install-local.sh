@@ -71,7 +71,7 @@ if (( ${#RUN_ID} > 64 )); then
   exit 2
 fi
 
-if [[ ! -f "$SOURCE_ROOT/manifest.json" || ! -f "$SOURCE_ROOT/index.js" || ! -f "$SOURCE_ROOT/lib/audio.js" ]]; then
+if [[ ! -f "$SOURCE_ROOT/manifest.json" || ! -f "$SOURCE_ROOT/index.js" ]]; then
   echo "install-local: source root is incomplete: $SOURCE_ROOT" >&2
   exit 1
 fi
@@ -93,7 +93,6 @@ BACKUP_DIR="$BACKUP_ROOT/$RUN_ID"
 PLUGIN_FILES=(
   "manifest.json"
   "index.js"
-  "lib/audio.js"
   "i18n.json"
   "options.json"
   "icon.svg"
