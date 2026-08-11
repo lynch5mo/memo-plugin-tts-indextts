@@ -107,17 +107,19 @@ test("staging symlink or extra file is rejected", { timeout: 20000 }, () => {
   assert.equal(fs.existsSync(path.join(root, "plugins", PLUGIN_DIR, "extra.txt")), false);
 });
 
-test("INSTALL_TEST_ROOT cannot bypass the guard for the real Memo root", { timeout: 20000 }, () => {
+test("real canonical Memo root is always rejected read-only", { timeout: 20000 }, () => {
   const realRoot = path.join(os.homedir(), "Library", "Application Support", "Memo");
   if (!fs.existsSync(realRoot)) {
     return;
   }
-  const result = run(INSTALL, ["--root", realRoot, "--run-id", "should-never-install"]);
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /not allowed for the real Memo root/i);
+  for (const env of [{ INSTALL_TEST_ROOT: "" }, { INSTALL_TEST_ROOT: "1" }]) {
+    const result = run(INSTALL, ["--root", realRoot, "--run-id", "should-never-install"], env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /direct installation to the real Memo root is unsupported/i);
+  }
 });
 
-test("fake Memo command line is not treated as a running Memo", { timeout: 25000 }, async () => {
+test("fake Memo command line is irrelevant to a temp-root install", { timeout: 25000 }, async () => {
   const root = makeRoot();
   const fake = path.join(root, "Memo.app.fake");
   fs.mkdirSync(path.join(fake, "Contents", "MacOS"), { recursive: true });
@@ -136,6 +138,50 @@ test("fake Memo command line is not treated as a running Memo", { timeout: 25000
       if (child.pid) process.kill(-child.pid, "SIGTERM");
     } catch {}
   }
+});
+
+test("plugins symlink escaping root is rejected by install and verify", { timeout: 20000 }, () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "memo-symlink-root-"));
+  const root = path.join(parent, "Memo");
+  const outside = path.join(parent, "outside");
+  for (const dir of ["plugin-staging", "plugin-backups"]) {
+    fs.mkdirSync(path.join(root, dir), { recursive: true });
+  }
+  fs.mkdirSync(path.join(outside, PLUGIN_DIR), { recursive: true });
+  for (const file of EXPECTED_FILES) {
+    const content = fs.readFileSync(path.join(REPO_ROOT, file));
+    fs.mkdirSync(path.dirname(path.join(outside, PLUGIN_DIR, file)), { recursive: true });
+    fs.writeFileSync(path.join(outside, PLUGIN_DIR, file), content);
+  }
+  fs.symlinkSync(outside, path.join(root, "plugins"), "dir");
+
+  const installed = installOk(root, "run-symlink");
+  assert.notEqual(installed.status, 0);
+  assert.match(installed.stderr, /path escapes root/i);
+  assert.equal(fs.existsSync(path.join(outside, PLUGIN_DIR, "old-marker.txt")), false);
+
+  const verified = verifyOk(root);
+  assert.notEqual(verified.status, 0);
+  assert.match(verified.stderr, /path escapes root|path escapes plugins/i);
+  assert.equal(fs.existsSync(path.join(outside, PLUGIN_DIR, "index.js")), true);
+});
+
+test("plugin dir symlink escaping root is rejected by verify", { timeout: 20000 }, () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "memo-plugin-symlink-"));
+  const root = path.join(parent, "Memo");
+  const outside = path.join(parent, "outside");
+  fs.mkdirSync(path.join(root, "plugins"), { recursive: true });
+  fs.mkdirSync(outside, { recursive: true });
+  for (const file of EXPECTED_FILES) {
+    const content = fs.readFileSync(path.join(REPO_ROOT, file));
+    fs.mkdirSync(path.dirname(path.join(outside, file)), { recursive: true });
+    fs.writeFileSync(path.join(outside, file), content);
+  }
+  fs.symlinkSync(outside, path.join(root, "plugins", PLUGIN_DIR), "dir");
+
+  const verified = verifyOk(root);
+  assert.notEqual(verified.status, 0);
+  assert.match(verified.stderr, /path escapes plugins|symlink/i);
 });
 
 test("apostrophe in root path is safe", { timeout: 20000 }, () => {

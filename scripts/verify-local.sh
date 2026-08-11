@@ -38,7 +38,27 @@ if [[ ! -d "$ROOT" ]]; then
 fi
 ROOT="$(cd "$ROOT" && pwd -P)"
 PLUGIN_DIR="$ROOT/plugins/$PLUGIN_ID@$PLUGIN_VERSION"
-if [[ "$PLUGIN_DIR" != "$(cd "$ROOT" && pwd -P)/plugins/$PLUGIN_ID@$PLUGIN_VERSION" ]]; then
+PATH_CHECK="$(node -e '
+const fs = require("node:fs");
+const path = require("node:path");
+const root = process.argv[1];
+const pluginDir = process.argv[2];
+const realRoot = fs.realpathSync(root);
+const realPlugins = fs.realpathSync(path.join(root, "plugins"));
+const realPluginDir = fs.realpathSync(pluginDir);
+const relative = path.relative(realRoot, realPlugins);
+if (relative === "" || relative.split(path.sep).some((part) => part === "..")) {
+  console.error("verify-local: plugins path escapes root: " + realPlugins);
+  process.exit(2);
+}
+const pluginRelative = path.relative(realPlugins, realPluginDir);
+if (pluginRelative === "" || pluginRelative.split(path.sep).some((part) => part === "..")) {
+  console.error("verify-local: plugin path escapes plugins: " + realPluginDir);
+  process.exit(2);
+}
+process.stdout.write("OK");
+' "$ROOT" "$PLUGIN_DIR")"
+if [[ "$PATH_CHECK" != "OK" ]]; then
   echo "verify-local: plugin path escapes root: $PLUGIN_DIR" >&2
   exit 2
 fi

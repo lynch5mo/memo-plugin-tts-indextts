@@ -11,9 +11,9 @@
 
 ## 安装安全契约（Task 1）
 
-- `scripts/install-local.sh`：校验源码根、manifest 插件 ID/版本；真实 Memo 运行时拒绝替换；先复制到 `plugin-staging/<run-id>/` 并校验，再原子移动到版本目录；同版本旧目录移入 `plugin-backups/.../<run-id>/`，不删除旧目录；只复制插件必需白名单文件，不触碰其他插件或 `plugins/index.json`。
-- `scripts/verify-local.sh`：校验目标文件清单、源码哈希、manifest 契约和 Node `require()` 返回静音 WAV `Buffer`；不启动或关闭 Memo。
-- 临时 root 注入通过 `--root DIR` 验证，可覆盖 staging/install/backup/verify 全流程。
+- `scripts/install-local.sh`：校验源码根、manifest 插件 ID/版本；对 canonical 真实 `~/Library/Application Support/Memo` **无条件 fail-closed 拒绝**（无论 Memo 是否运行），错误信息明确要求后续经批准的 Memo-owned `.memox` 流程；仅允许明确非真实临时 root 用于测试/验证。临时 root 流程先复制到 `plugin-staging/<run-id>/` 并校验，再移动到版本目录；同版本旧目录移入 `plugin-backups/.../<run-id>/`，不删除旧目录；只复制插件必需白名单文件，不触碰其他插件或 `plugins/index.json`。
+- `scripts/verify-local.sh`：用 Node argv + `fs.realpathSync` 校验 canonical `plugins` 是 canonical root 的严格 descendant、canonical plugin dir 是 canonical `plugins` 的严格 descendant；拒绝 `root/plugins` symlink 指向 root 外、plugin dir symlink、恶意 version；再校验目标文件清单、源码哈希、manifest 契约和 Node `require()` 返回静音 WAV `Buffer`；不启动或关闭 Memo。
+- 临时 root 注入通过 `--root DIR` 验证，可覆盖 staging/install/backup/verify 全流程；真实 root 任何写入均由脚本无条件拒绝。
 
 ## Gate A 结果：STOPPED_AT_GATE_A
 

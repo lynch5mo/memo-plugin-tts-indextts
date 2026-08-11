@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PLUGIN_ID="memo-plugin-tts-gptsovits"
+REAL_MEMO_ROOT="$HOME/Library/Application Support/Memo"
 
 usage() {
   echo "Usage: install-local.sh [--root DIR] [--run-id ID]" >&2
@@ -21,7 +22,7 @@ while (($# > 0)); do
 done
 
 if [[ -z "$ROOT" ]]; then
-  ROOT="$HOME/Library/Application Support/Memo"
+  ROOT="$REAL_MEMO_ROOT"
 fi
 if [[ -z "$RUN_ID" ]]; then
   RUN_ID="$(date +%Y%m%d%H%M%S)-$$"
@@ -38,18 +39,10 @@ if [[ ! -d "$ROOT" ]]; then
   exit 2
 fi
 ROOT="$(cd "$ROOT" && pwd -P)"
-REAL_MEMO_ROOT=""
-if [[ -d "$HOME/Library/Application Support/Memo" ]]; then
-  REAL_MEMO_ROOT="$(cd "$HOME/Library/Application Support/Memo" && pwd -P)"
-fi
 
-TEST_ROOT_ONLY=0
-if [[ -n "${INSTALL_TEST_ROOT:-}" ]]; then
-  if [[ -n "$REAL_MEMO_ROOT" && "$ROOT" == "$REAL_MEMO_ROOT" ]]; then
-    echo "install-local: INSTALL_TEST_ROOT is not allowed for the real Memo root" >&2
-    exit 3
-  fi
-  TEST_ROOT_ONLY=1
+if [[ "$ROOT" == "$(cd "$REAL_MEMO_ROOT" && pwd -P)" ]]; then
+  echo "install-local: direct installation to the real Memo root is unsupported; use the approved Memo-owned .memox flow instead" >&2
+  exit 3
 fi
 
 # Validate run id: one non-empty segment, no separators, dots, slashes, whitespace, or control chars.
@@ -94,20 +87,6 @@ PLUGIN_FILES=(
   "icon.svg"
 )
 
-guard_memo_running() {
-  if [[ -z "$REAL_MEMO_ROOT" || "$ROOT" != "$REAL_MEMO_ROOT" ]]; then
-    return 0
-  fi
-  local main_pid=""
-  local helper_pid=""
-  main_pid="$(pgrep -x Memo 2>/dev/null || true)"
-  helper_pid="$(pgrep -x 'Memo Helper' 2>/dev/null || true)"
-  if [[ -n "$main_pid" || -n "$helper_pid" ]]; then
-    echo "install-local: Memo is running; refusing to replace plugin directory" >&2
-    exit 3
-  fi
-}
-
 is_descendant() {
   local candidate="$1"
   local base="$2"
@@ -125,8 +104,6 @@ for dir in "$STAGING_DIR" "$BACKUP_DIR" "$PLUGIN_DIR"; do
     exit 2
   fi
 done
-
-guard_memo_running
 
 if [[ -e "$STAGING_DIR" || -L "$STAGING_DIR" ]]; then
   echo "install-local: staging already exists; refusing reuse: $STAGING_DIR" >&2
@@ -146,8 +123,6 @@ for file in "${PLUGIN_FILES[@]}"; do
   mkdir -p "$(dirname "$STAGING_DIR/$file")"
   cp "$SOURCE_ROOT/$file" "$STAGING_DIR/$file"
 done
-
-guard_memo_running
 
 while IFS= read -r -d '' found; do
   if [[ -L "$found" ]]; then
@@ -180,18 +155,12 @@ if [[ -e "$PLUGIN_DIR" || -L "$PLUGIN_DIR" ]]; then
   needs_backup=1
 fi
 
-guard_memo_running
-
 if [[ "$needs_backup" -eq 1 ]]; then
   mv "$PLUGIN_DIR" "$BACKUP_DIR"
   echo "install-local: moved existing plugin dir to backup $BACKUP_DIR"
 fi
 
 if [[ "${INSTALL_SIMULATE_FINAL_MOVE_FAILURE:-}" == "1" ]]; then
-  if [[ "$TEST_ROOT_ONLY" -ne 1 ]]; then
-    echo "install-local: INSTALL_SIMULATE_FINAL_MOVE_FAILURE requires a test root" >&2
-    exit 3
-  fi
   echo "install-local: simulated final move failure" >&2
   if [[ "$needs_backup" -eq 1 && -e "$BACKUP_DIR" ]]; then
     mv "$BACKUP_DIR" "$PLUGIN_DIR"
