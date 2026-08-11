@@ -11,3 +11,7 @@ output/
 Profile/
 .DS_Store
 Thumbs.db
+dist/
+*.memox
+*.sha256
+.memox-extract/
