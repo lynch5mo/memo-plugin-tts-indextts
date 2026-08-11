@@ -37,10 +37,13 @@
 ## Gate C — 真实 TTS 调用
 
 - 调用 GPT-SoVITS 生成语音并在 Memo 中完成端到端使用。
-- 状态：未验证；本 Task 不生成语音、不安装插件。
+- 状态：未验证；未生成真实 GPT-SoVITS 语音，未完成端到端调用（Phase 0 仅安装并
+  登记静音占位插件）。
 
 ## 未验证项
 
-- Memo runtime 插件发现/加载。
+- Memo runtime 插件发现/加载已通过 Task 1A 原生 `.memox` 安装、登记与宿主 NodeVM
+  加载验证；仍未验证的是 Temo 服务下拉框中的 provider 选择与宿主内最小静音调用，
+  原因见 Gate A：Temo 硬编码 TTS provider 白名单（Edge/Volcengine）。
 - GPT-SoVITS 实际合成质量与参数兼容性。
 - 完整音色库 UI 与配置持久化。
