@@ -4,6 +4,10 @@ output/
 *.mp3
 *.aiff
 *.m4a
+*.mp4
+*.mov
+*.mkv
+*.webm
 Profile/
 .DS_Store
 Thumbs.db
