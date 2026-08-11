@@ -1,0 +1,9 @@
+node_modules/
+output/
+*.wav
+*.mp3
+*.aiff
+*.m4a
+Profile/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="GPT-SoVITS TTS">
+  <rect width="128" height="128" rx="20" fill="#17202a"/>
+  <path d="M28 54h14v20h-14zM50 44h14v40h-14zM72 50h14v28h-14zM94 58h14v12h-14z" fill="#e8edf2"/>
+  <circle cx="64" cy="64" r="38" fill="none" stroke="#3ea6ff" stroke-width="4"/>
+</svg>
