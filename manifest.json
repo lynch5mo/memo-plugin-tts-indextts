@@ -4,7 +4,7 @@
   "pluginId": "memo-plugin-tts-gptsovits",
   "version": "1.0.0",
   "title": "GPT-SoVITS TTS",
-  "description": "Phase 0 minimal GPT-SoVITS TTS provider for Memo.",
+  "description": "Phase 0 minimal GPT-SoVITS TTS provider for Memo (silence-only placeholder).",
   "type": "tts",
   "platforms": [
     "darwin"
