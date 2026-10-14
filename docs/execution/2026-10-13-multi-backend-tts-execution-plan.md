@@ -1,6 +1,6 @@
 # Memo 多后端本地语音插件执行方案
 
-版本：v1；日期：2026-10-13；状态：已获实施授权。设计事实与实现结果分开记录。
+版本：v1.1；日期：2026-10-13；2026-10-14 根据 GLM 审查补充验收边界；状态：已获实施授权。设计事实与实现结果分开记录。
 
 给执行 Agent：Friday 使用 superpowers:subagent-driven-development 逐任务派发；DeepSeek worker 只执行自己的任务简报，不再派生其他 Agent。每项任务先写测试、记录预期失败，再实现、验证、提交，最后交 GLM 独立审查。
 
@@ -36,7 +36,8 @@
 - 基线提交：c8b06162c93c56dfe16163cc8f365603c9a0b14f；原始 28 项测试通过，但只证明 Phase 0 占位行为。
 - P0：HTTP、音频、身份、目录及模型绑定的自动化契约通过。
 - P1：本机现有 Audio8 经过插件入口合成，获得非静音、可播放且结尾完整的中文和中英混合语音。
-- P2：真实 Memo 原生导入、引擎与音色菜单、生成音频、更新绑定后的缓存和旧版配置升级通过。
+- P2：真实 Memo 原生导入、引擎与音色菜单、生成音频、更新绑定后的缓存和下述重置式升级标准通过。
+- 1.0.0 → 2.0.0 采用重置式升级：新版本首次运行使用其 manifest 默认值；旧 speed/language 不进入 Audio8 请求；保留旧 1.0.0 配置及可回退安装；主人重新选择引擎、catalogPath 和音色。不能把保留 pluginId 解释为自动迁移。若宿主实际保留其他值，记录并显式校正，不改真实索引绕过。
 - P3：临时/持久音色及保护边界通过；GPT-SoVITS 单独实测通过后才标可用。
 - 未达到的级别如实保留，不把 P0 说成整个插件已经可用。GPT 缺权重或环境不兼容时不擅自安装，保留适配器契约和具体未就绪原因。
 
@@ -66,7 +67,7 @@
 内部请求均为普通对象和 Buffer，不引入额外类型系统或依赖。
 
 - HTTP：request({baseUrl, path, method, json, body, headers, timeoutMs, maxBytes}) → Promise<{statusCode, headers, body}>。默认合成超时 120000ms，探测 3000ms，单次响应上限 16MiB。
-- WAV：parseWav(buffer) → {sampleRate, channels, bitsPerSample, pcm}；joinWav(buffers) → Buffer。首版支持 PCM16，最多 2 声道；最终输出上限 128MiB。
+- WAV：parseWav(buffer) → {sampleRate, channels, bitsPerSample, pcm}；joinWav(buffers) → Buffer。首版支持 PCM16，最多 2 声道；最终 WAV 容器（含头部）上限 128MiB，累计大小在分配合并 Buffer 之前校验。
 - 文本：splitText(text, maxChars) → string[]。以 Unicode code point 计数，段拼接必须等于输入；空输入明确失败，总输入最多 10000 个 code point，不悄悄截断。
 - 声音身份：encodeVoiceValue({backendId, endpointId, bindingId, revision}) → string；decodeVoiceValue(value) → 同一对象。前缀 localtts:v1:，正文使用 base64url JSON；revision 为正整数。
 - 目录：readCatalog(catalogPath) → {schemaVersion:1, endpoints:[], profiles:[], bindings:[]}；resolveBinding(catalog, model, voiceValue) → 固定 endpoint/profile/binding 快照。
@@ -95,6 +96,7 @@
 
 - [ ] 写失败测试：本地 HTTP 真服务器返回手工 PCM16 WAV；200 JSON、3xx、超时、16MiB 超限、非 loopback/凭据 URL 均失败；超时 POST 只发一次，不跟随重定向。
 - [ ] 写 WAV 测试：可含合法额外 RIFF chunk；拒绝长度不符、空 PCM、纯静音、非法 fmt/data、采样率/声道/位深不一致；两份 WAV 合并后只有一个容器且 PCM 逐样本正确。
+- [ ] 写累计边界测试：每份 WAV 均小于 16MiB，但累计 PCM 加最终容器头部超过 128MiB 时，joinWav 必须在合并分配前失败；使用重复引用合法非静音小块控制测试本身的内存，不能返回部分音频或靠单响应超限代替此测试。
 - [ ] 写文本测试：中文、英文、emoji、空白及标点分段，join('') 精确等于原文；单段不超限；空输入和超过 10000 code point 明确失败。
 - [ ] 运行 node --test test/http-client.test.js test/wav.test.js test/text.test.js，记录预期 RED，再最小实现上述接口。
 - [ ] 使用有界内存及明确错误，不依赖全局 fetch 或上层代理；音频验证不是靠文件扩展名判断。
@@ -113,6 +115,7 @@
 - [ ] 运行新测试，记录 RED；读取本机 Audio8 service.py/voices.py/runtime_manifest.json 及 GPT-SoVITS api_v2.py 的实际契约后实现。
 - [ ] 音色校验包含 model_fingerprint；Audio8 的 health 不能证明指纹，必须要求本机 manifest 与 endpoint 的显式关联及有效性证据。未取得证据则保持 unverified。
 - [ ] 分段首轮使用 120 code point；保留完整输入，不设置虚假的原生 speed；对分段格式变化及失败整体报错。
+- [ ] 分段调度跟踪最终 WAV 的累计字节数；一段加入后超过 128MiB 即整体失败、不再发送下一段，不把已经得到的音频返回为成功。测试累计超限后无后续 POST，并与 Task 1 的容器总上限一致。
 - [ ] 合成读取一次目录形成快照；改变目录不能把进行中的请求换成另一个声音。外部旧 profiles 仅引用，缺源音频标清楚。
 - [ ] 运行针对性测试和 npm test，保存完整输出；本地提交并报告。真实端点验证属于 Task 5，不把模拟服务当作本机模型验收。
 
@@ -128,6 +131,7 @@
 - [ ] 写缓存身份测试：revision、endpoint、model 改变导致 voiceName 不同；manifest 的 ttsInput 包含 model/voiceName 等合成相关字段。此测试只证明插件输出身份，宿主缓存另由 Task 5 实测。
 - [ ] 运行新/修订测试，记录 RED，然后实现单文件构建及入口。构建器只打包静态源码清单，不执行用户路径的模块，不引入运行时依赖。
 - [ ] 去掉旧 0–100 speed 的输入映射；中文说明升级配置按 pluginId@version 存储，旧值不自动映射成模型参数。不读写真实 Memo 索引来“迁移”。
+- [ ] 测试重置式升级：2.0.0 新默认配置生效，传入旧 speed/language 也不进入 Audio8 HTTP 请求；临时 Memo root 的旧 1.0.0 配置保持原样；缺少新音色选择时给明确错误。README 写出重新选择引擎、资料目录、音色及原生回退步骤；真实宿主行为由 Task 5 再核验。
 - [ ] 保留原安全安装脚本“拒绝真实 Memo root”行为；版本/manifest 断言按新目标更新，不削弱符号链接、碰撞和回滚测试。
 - [ ] 运行 npm test、node 语法检查、bash -n scripts/*.sh 和打包/解包执行测试，保存日志；本地提交后交 GLM 审查。
 
