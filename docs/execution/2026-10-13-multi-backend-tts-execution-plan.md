@@ -75,6 +75,7 @@
 - endpoint：id、backendId、baseUrl、modelFingerprint、readiness；Audio8 增加 runtimeManifestPath、voicesRoot、precision、codecPrecision。其路径只读、须核验真实路径及已确认的服务关联；单凭旧 manifest 文件不能宣称在线模型已确认。
 - profile：id、label、persistence（saved/temporary/external）、source（audioPath/referenceText/language，可缺但不能声称可迁移）、owner。
 - binding：id、profileId、backendId、endpointId、nativeVoiceId、modelFingerprint、revision、status（ready/unverified/invalid/needsPreparation）、params。参考资料、endpoint 或模型改变必须更新 revision。
+- Audio8 binding 另保存 nativeVoiceFingerprint：由实际 name/reference_text/source_sha256/model_fingerprint/shape/dtype/sample_rate 的固定顺序对象计算 SHA-256，适配器导出 voiceFingerprint(meta) 供管理工具复用。合成前、列声音时比对当前元数据；同名外部声音被改写时旧绑定不可用，提示重新确认并增加 revision。该校验不能承诺宿主已经缓存的历史音频会自动清除，真实缓存边界需 Task5报告。
 - 每个适配器：id、capabilities；probe(context)、listVoices(context)、synthesize({endpoint,binding,profile,text,parameters})。后者返回 {audio:Buffer}，不能伪造模型未提供的 EOS/完成原因。
 - Audio8：POST /api/tts，text、voice_name 和已支持的采样参数；GET /api/health、GET /api/voices。中文/英文不以参考录音语言过滤声音。
 - Audio8 身份接口：使用 scripts/audio8-service.py 直接运行已安装的 FastAPI app，不修改安装源码。GET /api/memo/runtime 从当前 require_runtime() 对象返回 {backendId:"audio8", modelFingerprint, modelDir, voicesRoot, precision, codecPrecision, instanceId}；instanceId 为本次服务进程随机值。适配器比对本机 manifest 指纹、modelDir/voicesRoot 真实路径、精度与在线报告，再比对声音元数据；只填 readiness=verified 不足以放行，裸服务缺接口时明确 unverified。辅助入口不切权重，不发起合成，不新增代理或模型进程；仅用本机已有 Python 环境，默认 loopback 监听，服务启动仍显式执行。

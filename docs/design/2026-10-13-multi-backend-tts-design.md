@@ -128,6 +128,8 @@ Audio8 当前 voices.load 不会检查 meta.json 的 model_fingerprint，虽然�
 
 2026-10-14 实施澄清：Audio8 使用本项目的轻量启动辅助入口，导入既有 FastAPI app，在同一模型服务进程增加只读 GET /api/memo/runtime。它从实际已加载的 runtime 对象返回 backendId、modelFingerprint、modelDir、voicesRoot、precision、codecPrecision 和随机服务实例 ID；不会另起代理、修改已安装源码、安装依赖或下载模型。插件将在线模型、真实路径与本机 manifest、音色元数据同时核对，每次合成前重新探测；普通裸服务缺少该接口时明确标为“未验证”，不根据人为填写 ready 绕过。首次实际合成仍是独立验收门槛，身份检查不能代替试音。已有声音可以只读使用原目录；创建新声音时使用明确归属的 voices root。
 
+Audio8 绑定还保存原生音色元数据摘要 nativeVoiceFingerprint；同名音色在外部服务里被改写后不能无声地沿用旧绑定。插件校验新合成，管理工具重新确认并增加 revision；历史 Memo 脚本及已缓存音频不由管理工具自动改写或删除，宿主缓存行为须单独验证和说明。
+
 ### 临时与持久音色
 
 - 临时音色也须保存足够的参考资料与后端绑定，使用随机 ID 和明确归属，不以讲师名称判断可删除性。
