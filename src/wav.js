@@ -70,13 +70,32 @@ function parseFmtChunk(body) {
   return { channels, sampleRate, bitsPerSample, blockAlign };
 }
 
-function isAllZero(buffer) {
-  for (let index = 0; index < buffer.length; index += 1) {
-    if (buffer[index] !== 0) {
-      return false;
+// 非静音按“每个声道在时间上是否变化”判定，不设响度阈值：
+// 恒定直流、全零与单帧都属于没有时间变化的无声结果，必须拒绝。
+function hasTemporalVariation(pcm, channels) {
+  const frameBytes = channels * 2;
+  const frames = pcm.length / frameBytes;
+  if (frames <= 1) {
+    return false;
+  }
+  for (let channel = 0; channel < channels; channel += 1) {
+    const first = pcm.readInt16LE(channel * 2);
+    for (let frame = 1; frame < frames; frame += 1) {
+      if (pcm.readInt16LE(frame * frameBytes + channel * 2) !== first) {
+        return true;
+      }
     }
   }
-  return true;
+  return false;
+}
+
+function assertTemporalVariation(pcm, channels) {
+  if (!hasTemporalVariation(pcm, channels)) {
+    throw createError(
+      "ERR_WAV_SILENT",
+      "音频在所有声道上都是恒定波形（全零、直流或单帧），没有任何时间变化，按契约拒绝返回。",
+    );
+  }
 }
 
 function parseWav(buffer) {
@@ -146,9 +165,7 @@ function parseWav(buffer) {
   if (pcm.length % fmt.blockAlign !== 0) {
     throw malformed(`PCM 长度 ${pcm.length} 不是 blockAlign ${fmt.blockAlign} 的整数倍`);
   }
-  if (isAllZero(pcm)) {
-    throw createError("ERR_WAV_SILENT", "音频是纯静音占位波形，按契约拒绝返回。");
-  }
+  assertTemporalVariation(pcm, fmt.channels);
 
   return {
     sampleRate: fmt.sampleRate,
@@ -217,6 +234,11 @@ function joinWav(buffers) {
     part.pcm.copy(output, offset);
     offset += part.pcm.length;
   }
+
+  // 逐段核验已经保证合并结果同样有变化；这里对最终 PCM 再做一次相同检查，
+  // 作为将来放宽逐段判定或改动拼接逻辑时的冗余防线。
+  assertTemporalVariation(output.subarray(CANONICAL_HEADER_BYTES), first.channels);
+
   return output;
 }
 

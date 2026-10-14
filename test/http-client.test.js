@@ -3,6 +3,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
+const dns = require("node:dns");
+const util = require("node:util");
 
 const { request, DEFAULT_MAX_BYTES } = require("../src/http-client.js");
 const { makeToneWav } = require("./helpers/wav-fixture.js");
@@ -127,6 +129,91 @@ test("3xx 重定向直接失败且不跟随到目标服务器", async () => {
     await stopServer(source.server);
     await stopServer(target.server);
   }
+});
+
+test("3xx 错误对象不保留可能带凭据的 Location", async () => {
+  const credentialLocation = "http://user:fakecred@127.0.0.1:9/api/tts";
+  const { server, baseUrl } = await startServer((req, res) => {
+    res.writeHead(307, { location: credentialLocation });
+    res.end();
+  });
+
+  try {
+    const error = await assertRejectsCode(
+      request({ baseUrl, path: "/api/tts", method: "POST", json: { text: "重定向" } }),
+      "ERR_REDIRECT",
+    );
+
+    assert.equal(error.statusCode, 307);
+    assert.equal(error.location, undefined);
+    assert.ok(!String(error.message).includes("fakecred"), "错误信息不得回显 Location 凭据");
+    assert.ok(!util.inspect(error).includes("fakecred"), "错误对象整体不得保留 Location 凭据");
+  } finally {
+    await stopServer(server);
+  }
+});
+
+test("localhost 解析到非 loopback 地址时拒绝，且不发起连接", async () => {
+  const realPromisesLookup = dns.promises.lookup;
+  const realLookup = dns.lookup;
+  let netLookups = 0;
+  dns.promises.lookup = async () => [{ address: "203.0.113.9", family: 4 }];
+  dns.lookup = (...args) => {
+    netLookups += 1;
+    return realLookup.apply(dns, args);
+  };
+
+  try {
+    const error = await assertRejectsCode(
+      request({ baseUrl: "http://localhost:9", path: "/api/health", timeoutMs: 2000 }),
+      "ERR_ENDPOINT_NOT_LOOPBACK",
+    );
+
+    assert.ok(error.message.includes("203.0.113.9"), "错误信息应指出解析到的非 loopback 地址");
+    assert.equal(netLookups, 0, "被拒的主机不得进入连接阶段");
+  } finally {
+    dns.promises.lookup = realPromisesLookup;
+    dns.lookup = realLookup;
+  }
+});
+
+test("localhost 核验为 loopback 后直接连接该已验证地址，不重新解析", async () => {
+  let hits = 0;
+  let hostHeader = null;
+  const { server, baseUrl } = await startServer((req, res) => {
+    hits += 1;
+    hostHeader = req.headers.host;
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end('{"ok":true}');
+  });
+  const port = new URL(baseUrl).port;
+  const realPromisesLookup = dns.promises.lookup;
+  const realLookup = dns.lookup;
+  let promiseLookups = 0;
+  let netLookups = 0;
+  dns.promises.lookup = async () => {
+    promiseLookups += 1;
+    return [{ address: "127.0.0.1", family: 4 }];
+  };
+  dns.lookup = (...args) => {
+    netLookups += 1;
+    return realLookup.apply(dns, args);
+  };
+
+  try {
+    const response = await request({ baseUrl: `http://localhost:${port}`, path: "/api/health" });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(hits, 1);
+    assert.equal(hostHeader, `localhost:${port}`, "替换连接地址后仍应保留原始 Host");
+  } finally {
+    dns.promises.lookup = realPromisesLookup;
+    dns.lookup = realLookup;
+    await stopServer(server);
+  }
+
+  assert.equal(promiseLookups, 1);
+  assert.equal(netLookups, 0, "不得把未核验的主机名交给底层再次解析");
 });
 
 test("超时的 POST 只发送一次，不自动重试", async () => {

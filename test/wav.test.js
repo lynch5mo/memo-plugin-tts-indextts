@@ -7,6 +7,7 @@ const { parseWav, joinWav, MAX_CONTAINER_BYTES } = require("../src/wav.js");
 const {
   pcm16NonSilent,
   pcm16Silent,
+  pcm16ConstantPerChannel,
   asciiChunk,
   buildWav,
   countAscii,
@@ -92,6 +93,53 @@ test("拒绝纯静音 PCM", () => {
   const wav = buildWav({ pcm: pcm16Silent(64) });
 
   assertErrorCode(() => parseWav(wav), "ERR_WAV_SILENT");
+});
+
+test("拒绝全零以外的恒定直流波形（GLM 探针一：四个 -32768 样本）", () => {
+  const pcm = pcm16ConstantPerChannel([-32768], 4);
+  const wav = buildWav({ pcm });
+
+  assertErrorCode(() => parseWav(wav), "ERR_WAV_SILENT");
+});
+
+test("拒绝单帧 PCM，即使该样本非零", () => {
+  const wav = buildWav({ pcm: pcm16ConstantPerChannel([1000], 1) });
+
+  assertErrorCode(() => parseWav(wav), "ERR_WAV_SILENT");
+});
+
+test("拒绝左右声道各自恒定但取值不同的双声道 PCM", () => {
+  const pcm = pcm16ConstantPerChannel([1000, -1000], 3);
+  const wav = buildWav({ pcm, channels: 2 });
+
+  assertErrorCode(() => parseWav(wav), "ERR_WAV_SILENT");
+});
+
+test("允许只有一个声道存在真实时间变化的双声道 PCM，且不修改输入", () => {
+  const frames = 4;
+  const pcm = Buffer.alloc(frames * 4);
+  for (let frame = 0; frame < frames; frame += 1) {
+    pcm.writeInt16LE(1000, frame * 4);
+    pcm.writeInt16LE(frame % 2 === 0 ? 1000 : -1000, frame * 4 + 2);
+  }
+  const pcmSnapshot = Buffer.from(pcm);
+  const wav = buildWav({ pcm, channels: 2 });
+  const wavSnapshot = Buffer.from(wav);
+
+  const parsed = parseWav(wav);
+
+  assert.deepEqual(Buffer.from(parsed.pcm), pcm);
+  assert.deepEqual(pcm, pcmSnapshot, "parseWav 不得修改输入 PCM");
+  assert.deepEqual(wav, wavSnapshot, "parseWav 不得修改输入容器");
+});
+
+test("允许正负 1 的低幅真实变化，不引入响度阈值", () => {
+  const pcm = Buffer.alloc(8);
+  [1, -1, 1, -1].forEach((value, index) => pcm.writeInt16LE(value, index * 2));
+
+  const parsed = parseWav(buildWav({ pcm }));
+
+  assert.deepEqual(Buffer.from(parsed.pcm), pcm);
 });
 
 test("拒绝缺少 fmt chunk 的 WAV", () => {
@@ -216,6 +264,25 @@ test("合并时任一段非法即整体失败，不返回部分音频", () => {
   assertErrorCode(() => joinWav([good, Buffer.from("not a wav", "ascii")]), "ERR_WAV_MALFORMED");
   assertErrorCode(() => joinWav([]), "ERR_WAV_INPUT");
   assertErrorCode(() => joinWav("not an array"), "ERR_WAV_INPUT");
+});
+
+test("合并两段各自恒定的一样本 WAV 时整体失败（GLM 探针二）", () => {
+  const sample = buildWav({ pcm: pcm16ConstantPerChannel([1000], 1) });
+
+  assertErrorCode(() => joinWav([sample, sample]), "ERR_WAV_SILENT");
+});
+
+test("合并前后都不修改输入 WAV", () => {
+  const first = buildWav({ pcm: pcm16NonSilent(5, { amplitude: 1000 }), sampleRate: 16000 });
+  const second = buildWav({ pcm: pcm16NonSilent(5, { amplitude: -2000 }), sampleRate: 16000 });
+  const firstSnapshot = Buffer.from(first);
+  const secondSnapshot = Buffer.from(second);
+
+  const joined = joinWav([first, second]);
+
+  assert.deepEqual(first, firstSnapshot, "joinWav 不得修改第一段输入");
+  assert.deepEqual(second, secondSnapshot, "joinWav 不得修改第二段输入");
+  assert.equal(joined.length, 44 + first.length - 44 + second.length - 44);
 });
 
 test("合并输入总量超过 128MiB 时在分配合并缓冲区之前失败", () => {

@@ -19,6 +19,18 @@ function pcm16Silent(sampleCount, { channels = 1 } = {}) {
   return Buffer.alloc(sampleCount * channels * 2);
 }
 
+// 每个声道各自取一个恒定值，用于构造直流（非零恒定）波形与左右不同的双声道波形。
+function pcm16ConstantPerChannel(channelValues, frameCount) {
+  const channels = channelValues.length;
+  const buffer = Buffer.alloc(frameCount * channels * 2);
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    for (let channel = 0; channel < channels; channel += 1) {
+      buffer.writeInt16LE(channelValues[channel], (frame * channels + channel) * 2);
+    }
+  }
+  return buffer;
+}
+
 function asciiChunk(id, payload, declaredSize) {
   const size = declaredSize === undefined ? payload.length : declaredSize;
   const padding = payload.length % 2 === 1 ? 1 : 0;
@@ -109,6 +121,7 @@ module.exports = {
   DEFAULT_SAMPLE_RATE,
   pcm16NonSilent,
   pcm16Silent,
+  pcm16ConstantPerChannel,
   asciiChunk,
   fmtChunk,
   buildWav,

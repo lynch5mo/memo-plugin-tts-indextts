@@ -4,6 +4,7 @@
 
 const http = require("node:http");
 const https = require("node:https");
+const dns = require("node:dns");
 
 const DEFAULT_SYNTHESIS_TIMEOUT_MS = 120000;
 const DEFAULT_PROBE_TIMEOUT_MS = 3000;
@@ -26,18 +27,29 @@ function normalizeHostname(rawHostname) {
     .replace(/\]$/, "");
 }
 
-function isLoopbackHostname(hostname) {
-  if (hostname === "localhost" || hostname.endsWith(".localhost")) {
-    return true;
+function isIpv4LoopbackLiteral(hostname) {
+  const octets = hostname.split(".");
+  if (octets.length !== 4 || octets[0] !== "127") {
+    return false;
   }
+  return octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255);
+}
+
+function isLoopbackAddress(hostname) {
   if (hostname === "::1" || hostname === "0:0:0:0:0:0:0:1") {
     return true;
   }
-  const octets = hostname.split(".");
-  if (octets.length === 4 && octets[0] === "127") {
-    return octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255);
-  }
-  return false;
+  // IPv4 映射写法 ::ffff:127.0.0.1 同样是 loopback。
+  const mapped = hostname.startsWith("::ffff:") ? hostname.slice("::ffff:".length) : hostname;
+  return isIpv4LoopbackLiteral(mapped);
+}
+
+function isLocalhostName(hostname) {
+  return hostname === "localhost" || hostname.endsWith(".localhost");
+}
+
+function isLoopbackHostname(hostname) {
+  return isLoopbackAddress(hostname) || isLocalhostName(hostname);
 }
 
 function resolveTarget(baseUrl, path) {
@@ -92,6 +104,48 @@ function normalizeMethod(rawMethod) {
     throw createError("ERR_REQUEST", "HTTP method 必须是字母组成的字符串。");
   }
   return method.toUpperCase();
+}
+
+function formatHostHeader(hostname, port) {
+  const host = hostname.includes(":") ? `[${hostname}]` : hostname;
+  return port ? `${host}:${port}` : host;
+}
+
+// localhost 这类名称必须先解析再核验，并直接连接已核验的地址：
+// 只检查文本会让本机 hostname 映射变化后离开 loopback，重新解析也属于同一类风险。
+async function resolveLoopbackAddress(hostname) {
+  if (isLoopbackAddress(hostname)) {
+    return hostname;
+  }
+
+  let resolved;
+  try {
+    resolved = await dns.promises.lookup(hostname, { all: true, verbatim: true });
+  } catch (error) {
+    throw createError(
+      "ERR_ENDPOINT_INVALID",
+      `无法解析 endpoint 主机 ${hostname}，不能确认它是 loopback，按策略拒绝。`,
+      { cause: error },
+    );
+  }
+  if (!Array.isArray(resolved) || resolved.length === 0) {
+    throw createError("ERR_ENDPOINT_INVALID", `endpoint 主机 ${hostname} 没有解析到任何地址，按策略拒绝。`);
+  }
+
+  const verified = [];
+  for (const entry of resolved) {
+    const address = normalizeHostname(entry && entry.address);
+    if (!isLoopbackAddress(address)) {
+      throw createError(
+        "ERR_ENDPOINT_NOT_LOOPBACK",
+        `endpoint 主机 ${hostname} 解析到非 loopback 地址 ${address || "(空)"}，按策略拒绝。`,
+      );
+    }
+    verified.push(address);
+  }
+
+  // 本机模型服务通常只监听 IPv4，优先连 127.x 以避免解析顺序带来的连接失败。
+  return verified.find((address) => address.startsWith("127.")) || verified[0];
 }
 
 function normalizeHeaders(rawHeaders) {
@@ -198,11 +252,12 @@ function request(options = {}) {
 
       if (statusCode >= 300 && statusCode < 400) {
         response.resume();
+        // 只保留状态码：Location 可能携带 userinfo 形式的凭据，不进入错误对象。
         fail(
           createError(
             "ERR_REDIRECT",
             `endpoint 返回 ${statusCode} 重定向，按策略不跟随，也不自动重试。`,
-            { statusCode, location: response.headers.location },
+            { statusCode },
           ),
         );
         return;
@@ -265,33 +320,8 @@ function request(options = {}) {
       });
     };
 
-    clientRequest = (target.parsed.protocol === "https:" ? https : http).request(
-      {
-        protocol: target.parsed.protocol,
-        hostname: target.hostname,
-        port: target.parsed.port || (target.parsed.protocol === "https:" ? 443 : 80),
-        path: target.path,
-        method,
-        headers,
-        agent: false,
-      },
-      onResponse,
-    );
-
-    clientRequest.on("error", (error) => {
-      if (settled) {
-        return;
-      }
-      if (error && error.code === "ERR_TIMEOUT") {
-        fail(error);
-        return;
-      }
-      fail(
-        createError("ERR_REQUEST", `请求失败：${error && error.message ? error.message : "未知错误"}`, {
-          cause: error,
-        }),
-      );
-    });
+    const isHttps = target.parsed.protocol === "https:";
+    const port = target.parsed.port || (isHttps ? 443 : 80);
 
     timer = setTimeout(() => {
       const error = createError(
@@ -299,14 +329,56 @@ function request(options = {}) {
         `请求超时（${timeoutMs}ms）：客户端停止等待，模型侧推理可能仍在继续，不做自动重试。`,
         { timeoutMs },
       );
-      clientRequest.destroy(error);
+      if (clientRequest) {
+        clientRequest.destroy(error);
+      }
       fail(error);
     }, timeoutMs);
 
-    if (payload) {
-      clientRequest.write(payload);
-    }
-    clientRequest.end();
+    resolveLoopbackAddress(target.hostname)
+      .then((destination) => {
+        if (settled) {
+          return;
+        }
+        if (destination !== target.hostname && headers.host === undefined) {
+          // 连接地址改成已核验的 IP，但保持调用方原本指定的 Host。
+          headers.host = formatHostHeader(target.hostname, port);
+        }
+        clientRequest = (isHttps ? https : http).request(
+          {
+            protocol: target.parsed.protocol,
+            hostname: destination,
+            port,
+            path: target.path,
+            method,
+            headers,
+            agent: false,
+            servername: isHttps ? target.hostname : undefined,
+          },
+          onResponse,
+        );
+
+        clientRequest.on("error", (error) => {
+          if (settled) {
+            return;
+          }
+          if (error && error.code === "ERR_TIMEOUT") {
+            fail(error);
+            return;
+          }
+          fail(
+            createError("ERR_REQUEST", `请求失败：${error && error.message ? error.message : "未知错误"}`, {
+              cause: error,
+            }),
+          );
+        });
+
+        if (payload) {
+          clientRequest.write(payload);
+        }
+        clientRequest.end();
+      })
+      .catch((error) => fail(error));
   });
 }
 
