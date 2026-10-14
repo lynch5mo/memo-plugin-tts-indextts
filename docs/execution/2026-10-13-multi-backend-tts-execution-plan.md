@@ -1,6 +1,6 @@
 # Memo 多后端本地语音插件执行方案
 
-版本：v1.1；日期：2026-10-13；2026-10-14 根据 GLM 审查补充验收边界；状态：已获实施授权。设计事实与实现结果分开记录。
+版本：v1.2；日期：2026-10-13；2026-10-14 根据 GLM 审查及实际 API 补充验收边界和同进程模型身份接口；状态：已获实施授权。设计事实与实现结果分开记录。
 
 给执行 Agent：Friday 使用 superpowers:subagent-driven-development 逐任务派发；DeepSeek worker 只执行自己的任务简报，不再派生其他 Agent。每项任务先写测试、记录预期失败，再实现、验证、提交，最后交 GLM 独立审查。
 
@@ -53,6 +53,7 @@
 | src/backends/index.js | 静态适配器注册与能力 |
 | src/plugin.js、index.js | Memo 导出和单文件发布入口 |
 | scripts/build-runtime.js | 固定源码集合构建，不加载用户扩展代码 |
+| scripts/audio8-service.py | 复用原 FastAPI app 的同进程启动辅助入口，只增加只读模型身份接口 |
 | manager/store.js、manager/server.js、manager/index.js | 按需音色资料管理与本机界面 |
 | scripts/smoke-local.js | 显式启动/连接与真实语音验证 |
 | test/*.test.js、test/helpers/* | 自动化行为及协议测试 |
@@ -66,7 +67,7 @@
 
 内部请求均为普通对象和 Buffer，不引入额外类型系统或依赖。
 
-- HTTP：request({baseUrl, path, method, json, body, headers, timeoutMs, maxBytes}) → Promise<{statusCode, headers, body}>。默认合成超时 120000ms，探测 3000ms，单次响应上限 16MiB。
+- HTTP：request({baseUrl, path, method, json, body, headers, timeoutMs, maxBytes}) → Promise<{statusCode, headers, body, json}>。json 是按响应类型解析的便捷字段，失败为 null；音频始终校验原始 body。默认合成超时 120000ms，探测 3000ms，单次响应上限 16MiB。
 - WAV：parseWav(buffer) → {sampleRate, channels, bitsPerSample, pcm}；joinWav(buffers) → Buffer。首版支持 PCM16，最多 2 声道；最终 WAV 容器（含头部）上限 128MiB，累计大小在分配合并 Buffer 之前校验。
 - 文本：splitText(text, maxChars) → string[]。以 Unicode code point 计数，段拼接必须等于输入；空输入明确失败，总输入最多 10000 个 code point，不悄悄截断。
 - 声音身份：encodeVoiceValue({backendId, endpointId, bindingId, revision}) → string；decodeVoiceValue(value) → 同一对象。前缀 localtts:v1:，正文使用 base64url JSON；revision 为正整数。
@@ -76,6 +77,7 @@
 - binding：id、profileId、backendId、endpointId、nativeVoiceId、modelFingerprint、revision、status（ready/unverified/invalid/needsPreparation）、params。参考资料、endpoint 或模型改变必须更新 revision。
 - 每个适配器：id、capabilities；probe(context)、listVoices(context)、synthesize({endpoint,binding,profile,text,parameters})。后者返回 {audio:Buffer}，不能伪造模型未提供的 EOS/完成原因。
 - Audio8：POST /api/tts，text、voice_name 和已支持的采样参数；GET /api/health、GET /api/voices。中文/英文不以参考录音语言过滤声音。
+- Audio8 身份接口：使用 scripts/audio8-service.py 直接运行已安装的 FastAPI app，不修改安装源码。GET /api/memo/runtime 从当前 require_runtime() 对象返回 {backendId:"audio8", modelFingerprint, modelDir, voicesRoot, precision, codecPrecision, instanceId}；instanceId 为本次服务进程随机值。适配器比对本机 manifest 指纹、modelDir/voicesRoot 真实路径、精度与在线报告，再比对声音元数据；只填 readiness=verified 不足以放行，裸服务缺接口时明确 unverified。辅助入口不切权重，不发起合成，不新增代理或模型进程；仅用本机已有 Python 环境，默认 loopback 监听，服务启动仍显式执行。
 - GPT-SoVITS：以本机 api_v2.py 的 POST /tts 为准；ref_audio_path、prompt_text、prompt_lang、text_lang、media_type=wav、streaming_mode=false。参数、参考音频及已加载模型组须核实；不同权重使用明确独立 endpoint。
 - Memo：new TTS(config).textToSpeech(options) → Promise<Buffer|string>；getEditorOptions({fieldKey,config,query,...}) → Promise<Array<{value,label}>>。model 为 audio8 或 gpt-sovits，voiceName 为版本化绑定值，catalogPath 为目录路径。
 - 默认资料目录由管理工具显式初始化为 ~/.local/share/memo-local-tts；测试和本轮运行使用隔离目录。插件只读，不自行创建或修改这个目录。
@@ -105,7 +107,7 @@
 
 ## Task 2：音色目录与两种后端适配器
 
-文件：新增 src/voice-value.js、src/catalog.js、src/backends/audio8.js、src/backends/gpt-sovits.js、src/backends/index.js、test/catalog.test.js、test/backends.test.js、test/voice-value.test.js；协议 fixture 仅放 test/helpers/。
+文件：新增 src/voice-value.js、src/catalog.js、src/backends/audio8.js、src/backends/gpt-sovits.js、src/backends/index.js、scripts/audio8-service.py、test/catalog.test.js、test/backends.test.js、test/voice-value.test.js；协议 fixture 仅放 test/helpers/。Python 辅助入口无新依赖，使用既有环境；具体运行验证由 Task 5 负责，Task 2 需有可独立运行的辅助入口检查。
 
 接口：消费 Task 1 的三个模块，产出 readCatalog、resolveBinding、encodeVoiceValue、decodeVoiceValue 及静态后端注册表。目录字段按“关键接口”统一，不自行改名。
 
@@ -114,7 +116,9 @@
 - [ ] 写 GPT 本地 HTTP 契约测试：参考音频/原文/语言映射、完整 WAV、JSON 错误；不得在每次合成切换全局权重；未验证 endpoint 不作为可用音色返回。
 - [ ] 运行新测试，记录 RED；读取本机 Audio8 service.py/voices.py/runtime_manifest.json 及 GPT-SoVITS api_v2.py 的实际契约后实现。
 - [ ] 音色校验包含 model_fingerprint；Audio8 的 health 不能证明指纹，必须要求本机 manifest 与 endpoint 的显式关联及有效性证据。未取得证据则保持 unverified。
+- [ ] 增加同进程身份辅助入口及本地契约测试：身份来自实际 runtime 对象而不是目录声明；缺接口、在线路径/指纹/精度不同均失败。允许只读引用已有 voices root，但禁止自动注册、reload 或修改服务。Python 脚本参数只决定显式启动的现有 Audio8 app，不被 Memo 插件当成用户模块加载器。
 - [ ] 分段首轮使用 120 code point；保留完整输入，不设置虚假的原生 speed；对分段格式变化及失败整体报错。
+- [ ] splitText 保留原输入；若分段中存在纯空白片段，不发送该片段的合成 POST，但所有非空白文字必须顺序完整覆盖，不能用 trim 截掉正文。
 - [ ] 分段调度跟踪最终 WAV 的累计字节数；一段加入后超过 128MiB 即整体失败、不再发送下一段，不把已经得到的音频返回为成功。测试累计超限后无后续 POST，并与 Task 1 的容器总上限一致。
 - [ ] 合成读取一次目录形成快照；改变目录不能把进行中的请求换成另一个声音。外部旧 profiles 仅引用，缺源音频标清楚。
 - [ ] 运行针对性测试和 npm test，保存完整输出；本地提交并报告。真实端点验证属于 Task 5，不把模拟服务当作本机模型验收。
