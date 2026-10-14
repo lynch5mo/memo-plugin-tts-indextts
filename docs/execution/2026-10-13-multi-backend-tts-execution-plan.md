@@ -10,7 +10,7 @@
 
 技术栈：Node.js 标准库、CommonJS、node:test、现有 Bash 打包工具；复用已安装 Audio8 ONNX 服务和 GPT-SoVITS，不在本轮自动安装或升级它们。
 
-设计基线：[多后端设计稿](../../design/2026-10-13-multi-backend-tts-design.md)。
+设计基线：[多后端设计稿](../design/2026-10-13-multi-backend-tts-design.md)。
 
 ## 全局约束
 
