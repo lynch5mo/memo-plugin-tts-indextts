@@ -12,7 +12,7 @@ const { spawnSync } = require("node:child_process");
 const REPO_ROOT = path.resolve(__dirname, "..");
 const BUILD = path.join(REPO_ROOT, "scripts", "build-memox.sh");
 const PLUGIN_ID = "memo-plugin-tts-gptsovits";
-const PLUGIN_VERSION = "1.0.0";
+const PLUGIN_VERSION = "2.0.0";
 const ARTIFACT_NAME = `memo-plugin-tts-gptsovits-${PLUGIN_VERSION}.memox`;
 const SIDE_CAR_NAME = `${ARTIFACT_NAME}.sha256`;
 const RUNTIME_FILES = [
@@ -335,16 +335,16 @@ test("package extracts and loads as the existing CommonJS provider", { timeout: 
   );
   assert.equal(manifest.pluginId, PLUGIN_ID);
   assert.equal(manifest.version, PLUGIN_VERSION);
-  assert.equal(manifest.importType, "commonjs");
+  assert.equal(manifest.importType, "module");
 
-  const TTS = require(path.join(extractDir, "index.js")).default;
-  assert.equal(typeof TTS, "function");
-  const buffer = await new TTS().textToSpeech({ text: "" });
-  assert.ok(Buffer.isBuffer(buffer));
-  assert.equal(buffer.subarray(0, 4).toString("ascii"), "RIFF");
-  assert.equal(buffer.subarray(8, 12).toString("ascii"), "WAVE");
-  assert.equal(buffer.readUInt32LE(24), 32000);
-  assert.equal(buffer.length, 44 + 3200 * 2);
+  const entry = require(path.join(extractDir, "index.js"));
+  assert.equal(typeof entry.default, "function");
+  assert.equal(typeof entry.getEditorOptions, "function");
+  // 解包后的入口在未配置资料时必须给固定中文分类错误，而不是静音占位 WAV。
+  const result = await new entry.default().textToSpeech({ text: "你好" });
+  assert.equal(Buffer.isBuffer(result), false, "packaged entry must not return a silence placeholder");
+  assert.equal(typeof result, "string");
+  assert.match(result, /^语音合成失败：/);
 });
 
 test("packaged index.js is self-contained and has no relative require", { timeout: 30000 }, () => {

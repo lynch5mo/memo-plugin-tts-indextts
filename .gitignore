@@ -15,3 +15,20 @@ dist/
 *.memox
 *.sha256
 .memox-extract/
+.omx/
+
+# 本地 Agent 记录、凭据、日志与模型/音色派生数据不进入源码仓库
+.superpowers/
+.env
+.env.*
+!.env.example
+*.log
+*.key
+*.pem
+*.npy
+*.onnx
+*.safetensors
+*.ckpt
+*.pth
+*.pt
+*.bin

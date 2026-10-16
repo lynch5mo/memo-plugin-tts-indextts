@@ -131,6 +131,7 @@
 接口：消费 Task 2 的目录和适配器；产出单文件 index.js，导出 default/getEditorOptions。使用 model、voiceName、catalogPath，默认 model=audio8；保留 provider 身份、版本 2.0.0、importType=module。
 
 - [ ] 写入口失败测试：实际请求覆盖构造配置形成快照；Buffer 合格且不是静音；服务关闭/声音缺失返回中文错误；空输入失败，不再沿用静音占位断言。
+- [ ] 写宿主重试边界测试：已安装 main 的 simpleTextToSpeech 会按 /429|RateLimit|timeout|ETIMEDOUT|ECONNRESET/i 匹配失败字符串并再调用一次。插件对 Memo 返回固定中文分类错误，不暴露可能匹配该正则的原错误码、后端正文、URL或可变诊断内容；内部错误仍保留供验证。客户端单次 POST 与模拟宿主不触发再调用两者都要证明，真实交互由 Task5记录。
 - [ ] 写动态菜单测试：model 返回两个引擎及真实就绪说明；voiceName 随 request.config.model/query 变化，只返回匹配且验证过的绑定；跨语言可选。
 - [ ] 写打包和升级测试：模块加载、default/getEditorOptions、固定打包白名单、同输入 byte-identical、源码内部依赖已打入 index.js；解包后独立运行不依赖项目源码或 manager。
 - [ ] 写缓存身份测试：revision、endpoint、model 改变导致 voiceName 不同；manifest 的 ttsInput 包含 model/voiceName 等合成相关字段。此测试只证明插件输出身份，宿主缓存另由 Task 5 实测。

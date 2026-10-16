@@ -119,18 +119,15 @@ const { spawnSync } = require("node:child_process");
 const pluginDir = process.argv[1];
 const result = spawnSync(process.execPath, ["-e", `
 const TTS = require(process.argv[1]).default;
-if (typeof TTS !== "function") throw new Error("default export is not a constructor");
-new TTS().textToSpeech({ text: "" }).then((buffer) => {
-  if (!Buffer.isBuffer(buffer)) throw new Error("textToSpeech did not return a Buffer");
-  if (buffer.toString("ascii", 0, 4) !== "RIFF") throw new Error("not a RIFF WAV");
-  if (buffer.toString("ascii", 8, 12) !== "WAVE") throw new Error("missing WAVE chunk");
-  if (buffer.readUInt32LE(24) !== 32000) throw new Error("sample rate mismatch");
-  if (buffer.readUInt16LE(22) !== 1) throw new Error("channel mismatch");
-  if (buffer.readUInt16LE(34) !== 16) throw new Error("bits per sample mismatch");
-  if (buffer.length !== 44 + 3200 * 2) throw new Error("unexpected WAV length");
-  for (let i = 44; i < buffer.length; i++) {
-    if (buffer[i] !== 0) throw new Error("PCM data is not silent");
-  }
+const entry = require(process.argv[1]);
+if (typeof entry.default !== "function") throw new Error("default export is not a constructor");
+if (typeof entry.getEditorOptions !== "function") throw new Error("getEditorOptions export is missing");
+new TTS().textToSpeech({ text: "你好" }).then((result) => {
+  if (typeof result !== "string") throw new Error("unconfigured entry must return a fixed error string");
+  if (!result.startsWith("语音合成失败：")) throw new Error("error string is not the fixed Chinese category");
+  return entry.getEditorOptions({ fieldKey: "model", config: {}, query: {} });
+}).then((options) => {
+  if (!Array.isArray(options) || options.length !== 2) throw new Error("model options must list both engines");
   console.log("verify-local: require contract OK");
 }).catch((error) => {
   console.error("verify-local: require contract failed:", error.message);

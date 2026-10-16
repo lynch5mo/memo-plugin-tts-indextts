@@ -1,9 +1,20 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-test("exposes a constructor and a Buffer-producing textToSpeech", async () => {
+test("发布入口导出 default 与 getEditorOptions，未配置时返回固定中文错误", async () => {
   const plugin = require("../index.js");
+
   assert.equal(typeof plugin.default, "function");
-  const result = await new plugin.default().textToSpeech({ text: "" });
-  assert.ok(Buffer.isBuffer(result));
+  assert.equal(typeof plugin.getEditorOptions, "function");
+  assert.deepEqual(Object.keys(plugin).sort(), ["default", "getEditorOptions"]);
+
+  const result = await new plugin.default().textToSpeech({ text: "你好" });
+  assert.equal(typeof result, "string");
+  assert.match(result, /^语音合成失败：/);
+
+  const options = await plugin.getEditorOptions({ fieldKey: "model", config: {}, query: {} });
+  assert.deepEqual(
+    options.map((entry) => entry.value),
+    ["audio8", "gpt-sovits"],
+  );
 });

@@ -1,32 +1,20 @@
 {
   "en": {
     "GPT-SoVITS TTS": "GPT-SoVITS TTS",
-    "Language": "Language",
-    "Speed": "Speed",
-    "lang": {
-      "中文(普通话，简体)": "Chinese (Mandarin, Simplified)",
-      "英语(美国)": "English (US)",
-      "日语(日本)": "Japanese (Japan)"
-    }
+    "Model": "Model",
+    "Voice": "Voice",
+    "Catalog": "Voice catalog"
   },
   "zh": {
     "GPT-SoVITS TTS": "GPT-SoVITS TTS",
-    "Language": "语言",
-    "Speed": "语速",
-    "lang": {
-      "中文(普通话，简体)": "中文(普通话，简体)",
-      "英语(美国)": "英语(美国)",
-      "日语(日本)": "日语(日本)"
-    }
+    "Model": "语音引擎",
+    "Voice": "音色",
+    "Catalog": "音色资料目录"
   },
   "zh_tw": {
     "GPT-SoVITS TTS": "GPT-SoVITS TTS",
-    "Language": "語言",
-    "Speed": "語速",
-    "lang": {
-      "中文(普通话，简体)": "中文(普通話，簡體)",
-      "英语(美国)": "英文(美國)",
-      "日语(日本)": "日文(日本)"
-    }
+    "Model": "語音引擎",
+    "Voice": "音色",
+    "Catalog": "音色資料目錄"
   }
 }

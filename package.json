@@ -1,11 +1,13 @@
 {
   "name": "memo-plugin-tts-gptsovits",
-  "version": "1.0.0",
-  "description": "Phase 0 GPT-SoVITS TTS provider for Memo with a deterministic local .memox builder",
+  "version": "2.0.0",
+  "description": "Multi-backend local TTS provider for Memo (Audio8 and GPT-SoVITS) with a deterministic .memox builder",
   "license": "MIT",
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "build": "node scripts/build-runtime.js",
+    "manager": "node manager/index.js",
     "test": "node --test test/*.test.js"
   }
 }

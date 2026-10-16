@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>本地音色管理</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>本地音色管理</h1>
+        <p class="subtitle">仅本机 127.0.0.1 可访问；不改动 Memo 与任何模型进程。</p>
+      </div>
+      <p class="status-chip" id="endpoint-summary">正在读取资料目录状态</p>
+    </header>
+
+    <main class="layout">
+      <section class="panel" aria-labelledby="prepare-title">
+        <h2 id="prepare-title">准备本次讲师音色</h2>
+        <form id="prepare-form" novalidate>
+          <div class="field">
+            <label for="label-input">名称</label>
+            <input id="label-input" name="label" type="text" maxlength="200" autocomplete="off" required />
+            <p class="hint">1 到 200 字符，仅用于本地显示，不参与音色身份。</p>
+          </div>
+
+          <div class="field">
+            <label for="audio-file">参考录音文件</label>
+            <input id="audio-file" name="audio" type="file" accept="audio/*" required />
+            <p class="hint">只读取你选择的本地文件，单个文件不超过 50MiB。</p>
+          </div>
+
+          <div class="field">
+            <label for="reference-text">准确原文</label>
+            <textarea id="reference-text" name="referenceText" rows="4" maxlength="4096" required></textarea>
+            <p class="hint">必须与录音逐字一致；换行与制表符按空白归一。</p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="language-input">参考语言</label>
+              <input id="language-input" name="language" type="text" value="zh" autocomplete="off" required />
+            </div>
+            <div class="field">
+              <label for="endpoint-select">端点引擎</label>
+              <select id="endpoint-select" name="endpointId" required></select>
+            </div>
+            <div class="field">
+              <label for="persistence-select">保存方式</label>
+              <select id="persistence-select" name="persistence">
+                <option value="temporary">临时使用</option>
+                <option value="saved">保存音色</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field checkbox-field">
+            <input id="authorization-check" name="authorizationConfirmed" type="checkbox" />
+            <label for="authorization-check">我已取得该声音的使用授权</label>
+          </div>
+
+          <button id="prepare-submit" type="submit">准备音色</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="voices-title">
+        <h2 id="voices-title">已有音色</h2>
+        <div id="voices-list" class="voices"></div>
+
+        <h3>导入已注册的外部音色</h3>
+        <form id="import-form" novalidate>
+          <div class="field-row">
+            <div class="field">
+              <label for="import-endpoint">端点 ID</label>
+              <input id="import-endpoint" name="endpointId" type="text" autocomplete="off" required />
+            </div>
+            <div class="field">
+              <label for="import-native">原生音色 ID</label>
+              <input id="import-native" name="nativeVoiceId" type="text" autocomplete="off" required />
+            </div>
+            <div class="field">
+              <label for="import-label">显示名称</label>
+              <input id="import-label" name="label" type="text" autocomplete="off" required />
+            </div>
+          </div>
+          <button id="import-submit" type="submit">导入</button>
+          <p class="hint">只导入目录已登记端点上的已有音色，不复制编码、不写入安装目录。</p>
+        </form>
+      </section>
+    </main>
+
+    <section class="panel status-panel">
+      <h2>操作结果</h2>
+      <p id="status-message" class="status-message" role="status" aria-live="polite">尚未执行操作。</p>
+    </section>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

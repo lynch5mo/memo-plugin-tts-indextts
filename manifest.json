@@ -2,9 +2,9 @@
   "$schema": "../../../../core/schemas/manifest.schema.json",
   "manifestVersion": "1",
   "pluginId": "memo-plugin-tts-gptsovits",
-  "version": "1.0.0",
-  "title": "GPT-SoVITS TTS",
-  "description": "Phase 0 minimal GPT-SoVITS TTS provider for Memo (silence-only placeholder).",
+  "version": "2.0.0",
+  "title": "本地语音合成（Audio8 / GPT-SoVITS）",
+  "description": "多后端本地 TTS provider，支持 Audio8 与 GPT-SoVITS。需要 Memo 1.8.8 或更高版本。",
   "type": "tts",
   "platforms": [
     "darwin"
@@ -12,35 +12,67 @@
   "arch": [
     "arm64"
   ],
-  "importType": "commonjs",
+  "importType": "module",
   "provider": {
     "value": "GPT-SoVITS TTS",
     "label": "GPT-SoVITS TTS"
   },
   "configuration": [
     {
-      "label": "Language",
-      "key": "language",
-      "type": "@plugins-components/Language"
+      "label": "Model",
+      "key": "model",
+      "type": "select"
     },
     {
-      "label": "Speed",
-      "key": "speed",
-      "type": "slider",
-      "range": {
-        "min": 0,
-        "max": 100,
-        "step": 1
-      }
+      "label": "Voice",
+      "key": "voiceName",
+      "type": "select"
+    },
+    {
+      "label": "Catalog",
+      "key": "catalogPath",
+      "type": "text"
     }
   ],
   "defaultsConfiguration": {
-    "language": "ZH_CN",
-    "speed": 10
+    "model": "audio8",
+    "voiceName": "",
+    "catalogPath": ""
   },
-  "configurationExposed": ["language", "speed"],
-  "ttsInput": ["language", "speed"],
+  "configurationExposed": [
+    "model",
+    "voiceName",
+    "catalogPath"
+  ],
+  "ttsInput": [
+    "model",
+    "voiceName",
+    "catalogPath"
+  ],
   "storageKey": "gptsovits",
-  "configurationStorage": ["language", "speed"],
-  "configurationRequired": []
+  "configurationStorage": [
+    "model",
+    "voiceName",
+    "catalogPath"
+  ],
+  "configurationRequired": [
+    "voiceName",
+    "catalogPath"
+  ],
+  "memoTtsEditor": {
+    "fields": {
+      "model": {
+        "role": "model",
+        "scope": "card"
+      },
+      "voiceName": {
+        "role": "voice",
+        "scope": "card"
+      },
+      "catalogPath": {
+        "role": "text",
+        "scope": "global"
+      }
+    }
+  }
 }

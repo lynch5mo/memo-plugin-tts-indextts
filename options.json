@@ -1,16 +1,1 @@
-{
-  "languages": [
-    {
-      "value": "ZH_CN",
-      "label": "lang.中文(普通话，简体)"
-    },
-    {
-      "value": "EN_US",
-      "label": "lang.英语(美国)"
-    },
-    {
-      "value": "JA_JP",
-      "label": "lang.日语(日本)"
-    }
-  ]
-}
+{}

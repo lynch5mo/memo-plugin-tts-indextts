@@ -9,7 +9,7 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const INSTALL = path.join(REPO_ROOT, "scripts", "install-local.sh");
 const VERIFY = path.join(REPO_ROOT, "scripts", "verify-local.sh");
 const PLUGIN_ID = "memo-plugin-tts-gptsovits";
-const PLUGIN_VERSION = "1.0.0";
+const PLUGIN_VERSION = "2.0.0";
 const PLUGIN_DIR = `${PLUGIN_ID}@${PLUGIN_VERSION}`;
 const EXPECTED_FILES = [
   "manifest.json",

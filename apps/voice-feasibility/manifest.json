@@ -1,0 +1,40 @@
+{
+  "$schema": "../../../../core/schemas/manifest.schema.json",
+  "manifestVersion": "1",
+  "version": "0.1.1",
+  "version_name": "alpha",
+  "minVersion": "1.8.8",
+  "title": "Voice capture feasibility",
+  "description": "只读可行性验证 App：读取当前文稿、调用本地 TTS provider，并在受限范围内截取音频样本。",
+  "type": "app",
+  "pluginId": "memo-plugin-app-voice-feasibility",
+  "category": "",
+  "platforms": [
+    "darwin"
+  ],
+  "arch": [
+    "arm64"
+  ],
+  "link": "",
+  "author": "memo-plugin-tts-multibackend",
+  "homepage": "",
+  "source": "",
+  "importType": "module",
+  "provider": {
+    "value": "Voice capture feasibility",
+    "label": "Voice capture feasibility"
+  },
+  "configuration": [],
+  "defaultsConfiguration": {},
+  "configurationExposed": [],
+  "ttsInput": [],
+  "storageKey": "",
+  "configurationStorage": [],
+  "configurationRequired": [],
+  "apis": [
+    "transcriptionData",
+    "plugin.getProviders",
+    "tts.synthesize",
+    "file.savePluginFile"
+  ]
+}

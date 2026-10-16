@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PLUGIN_ID="memo-plugin-tts-gptsovits"
-PLUGIN_VERSION="1.0.0"
+PLUGIN_VERSION="2.0.0"
 ARTIFACT_NAME="memo-plugin-tts-gptsovits-${PLUGIN_VERSION}.memox"
 SIDE_CAR_NAME="${ARTIFACT_NAME}.sha256"
 FIXED_MTIME="202601010000"
@@ -131,8 +131,8 @@ if [[ ! "$MANIFEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "build-memox: invalid manifest version: $MANIFEST_VERSION" >&2
   exit 1
 fi
-if [[ "$MANIFEST_IMPORT_TYPE" != "commonjs" ]]; then
-  echo "build-memox: manifest importType must be commonjs: $MANIFEST_IMPORT_TYPE" >&2
+if [[ "$MANIFEST_IMPORT_TYPE" != "module" ]]; then
+  echo "build-memox: manifest importType must be module: $MANIFEST_IMPORT_TYPE" >&2
   exit 1
 fi
 if [[ "$MANIFEST_TYPE" != "tts" ]]; then

@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Voice capture feasibility</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font: 13px/1.5 -apple-system, "PingFang SC", sans-serif; }
+  #root { padding: 12px; }
+  h1 { font-size: 15px; margin: 0 0 8px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { border: 1px solid #8884; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }
+  .ok { border-color: #2e7d32; }
+  .fail { border-color: #c62828; }
+  .step { font-weight: 600; }
+  .code { font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<div id="root"><h1>Voice capture feasibility</h1><ul id="steps"></ul></div>
+<script>
+(function () {
+  "use strict";
+  var stepsEl = document.getElementById("steps");
+  var q = new URLSearchParams(window.location.search);
+  var noteId = q.get("noteId") || "";
+  var folderId = q.get("folderId") || "";
+  var workspaceId = q.get("workspaceId") || "";
+  var core = (q.get("core") || "").replace(/\/+$/, "");
+  var runId = q.get("run") || "";
+  var wantProvider = q.get("provider") || "GPT-SoVITS TTS";
+  var wantPluginId = q.get("pluginId") || "memo-plugin-tts-gptsovits";
+  var wantModel = q.get("model") || "audio8";
+  var wantVoice = q.get("voiceName") || "";
+  var wantCatalog = q.get("catalogPath") || "";
+  var token = "";
+  var expected = null;
+  var mediaId = "";
+  var mediaLocator = "";
+  var nonce = "";
+  var corePort = "";
+  var runIdSeen = "";
+  var sessionId = "";
+  var originalAudio = null;
+  var translationAudio = null;
+  var records = [];
+
+  function push(step, ok, code, detail) {
+    var rec = { step: step, ok: !!ok, code: code || (ok ? "OK" : "FAIL"), detail: detail || {} };
+    records.push(rec);
+    var li = document.createElement("li");
+    li.className = ok ? "ok" : "fail";
+    var span = document.createElement("span");
+    span.className = "step";
+    span.textContent = step + " ";
+    var codeEl = document.createElement("span");
+    codeEl.className = "code";
+    codeEl.textContent = rec.code;
+    var detailEl = document.createElement("div");
+    detailEl.textContent = JSON.stringify(detail || {});
+    li.appendChild(span);
+    li.appendChild(codeEl);
+    li.appendChild(detailEl);
+    stepsEl.appendChild(li);
+    return rec;
+  }
+
+  function shape(value) {
+    if (value === null) return "null";
+    if (Array.isArray(value)) return "array[" + value.length + "]";
+    return typeof value;
+  }
+
+  function keysOf(value) {
+    return value && typeof value === "object" ? Object.keys(value).sort() : [];
+  }
+
+  function probeFetch(path, init) {
+    var opts = init || {};
+    opts.headers = Object.assign({}, opts.headers || {});
+    if (token) opts.headers["X-Probe-Token"] = token;
+    return fetch(core + path, opts);
+  }
+
+  function toBase64(u8) {
+    var s = "";
+    for (var i = 0; i < u8.length; i += 1) s += String.fromCharCode(u8[i]);
+    return btoa(s);
+  }
+
+  function nonSilent(samples) {
+    var peak = 0;
+    var sum = 0;
+    for (var i = 0; i < samples.length; i += 1) {
+      var v = Math.abs(samples[i]);
+      if (v > peak) peak = v;
+      sum += v;
+    }
+    return { peak: Number(peak.toFixed(6)), mean: samples.length ? Number((sum / samples.length).toFixed(6)) : 0, nonSilent: peak > 0.001 };
+  }
+
+  async function decodeStats(arrayBuffer) {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return { supported: false };
+    var ctx = new Ctx();
+    try {
+      var buf = await ctx.decodeAudioData(arrayBuffer);
+      var chan = buf.getChannelData(0);
+      var stats = nonSilent(chan);
+      return {
+        supported: true,
+        durationSec: Number(buf.duration.toFixed(6)),
+        sampleRate: buf.sampleRate,
+        channels: buf.numberOfChannels,
+        peak: stats.peak,
+        mean: stats.mean,
+        nonSilent: stats.nonSilent
+      };
+    } finally {
+      if (ctx.close) { try { ctx.close(); } catch (e) {} }
+    }
+  }
+
+  async function stepSession() {
+    if (!core) return push("session", false, "E_CONTEXT", { reason: "missing core origin" });
+    var res = await fetch(core + "/probe/session", { method: "GET" });
+    if (!res.ok) return push("session", false, "E_ORIGIN", { status: res.status });
+    var body = await res.json();
+    token = body.token || "";
+    nonce = body.nonce || "";
+    corePort = body.port || "";
+    runIdSeen = body.runId || "";
+    sessionId = body.sessionId || "";
+    return push("session", !!token, token ? "OK" : "E_CONTEXT", { run: body.runId || null, ttlMs: body.ttlMs || null });
+  }
+
+  async function stepExpected() {
+    var res = await probeFetch("/probe/expected", { method: "GET" });
+    if (!res.ok) return push("expected", false, "E_CONTEXT", { status: res.status });
+    expected = await res.json();
+    mediaId = expected.mediaId || "";
+    return push("expected", true, "OK", {
+      originalChars: (expected.originalText || "").length,
+      translationChars: (expected.translationText || "").length,
+      timelineCount: (expected.timeline || []).length
+    });
+  }
+
+  async function stepDetail() {
+    if (!noteId) return push("detail", false, "E_CONTEXT", { reason: "missing noteId" });
+    var row = await window.AIM.transcriptionData("detail", { id: noteId, workspaceId: workspaceId, folderId: folderId });
+    if (!row) return push("detail", false, "E_BRIDGE", { reason: "empty row" });
+    var timeline = Array.isArray(row.timeline) ? row.timeline : [];
+    var wantIds = ((expected && expected.timeline) || []).map(function (s) { return s.id; });
+    var gotIds = timeline.map(function (s) { return s.id; });
+    var matched = wantIds.length > 0 && wantIds.length === gotIds.length && wantIds.every(function (id, i) { return id === gotIds[i]; });
+    var hasMedia = !!(row.filePath || row.audioPath || row.mp3Path || row.videoPath || row.fileDest);
+    mediaLocator = row.audioPath || row.mp3Path || row.fileDest || row.filePath || row.videoPath || "";
+    var detail = {
+      keys: keysOf(row),
+      timelineCount: timeline.length,
+      wantTimelineCount: wantIds.length,
+      timelineIdsMatch: matched,
+      hasConvertResult: Array.isArray(row.convertResult),
+      hasTranslateResult: Array.isArray(row.translateResult) || (row.translateResult && typeof row.translateResult === "object"),
+      hasMediaLocator: hasMedia,
+      canplayVideo: !!row.canplayVideo,
+      hasAudio: !!row.hasAudio,
+      hasVideo: !!row.hasVideo
+    };
+    if (!matched) detail.gotIds = gotIds.slice(0, 8);
+    if (hasMedia) detail.mediaLocatorDisclosure = mediaLocator;
+    return push("detail", matched && hasMedia, matched ? (hasMedia ? "OK" : "E_MEDIA") : "E_CONTEXT", detail);
+  }
+
+  async function stepProviders() {
+    var list = await window.AIM.plugin.getProviders("tts");
+    var arr = Array.isArray(list) ? list : [];
+    var hit = arr.filter(function (p) {
+      return p && (p.provider === wantProvider || p.value === wantProvider || p.pluginId === wantPluginId);
+    });
+    return push("providers", hit.length > 0, hit.length > 0 ? "OK" : "E_BRIDGE", {
+      count: arr.length,
+      shape: shape(list),
+      entryKeys: hit.length ? keysOf(hit[0]) : [],
+      matched: hit.length
+    });
+  }
+
+  async function stepSynthesize() {
+    if (!expected || !expected.originalText) return push("synth", false, "E_CONTEXT", { reason: "no expected text" });
+    var res = await window.AIM.tts.synthesize({
+      text: expected.originalText,
+      provider: wantProvider,
+      pluginId: wantPluginId,
+      options: { model: wantModel, voiceName: wantVoice, catalogPath: wantCatalog },
+      returnBuffer: true
+    });
+    if (!res || res.success !== true || !res.data) {
+      return push("synth", false, "E_TTS", { shape: shape(res), keys: keysOf(res), hasData: !!(res && res.data) });
+    }
+    var bytes = res.data;
+    if (!(bytes instanceof ArrayBuffer) && !(bytes instanceof Uint8Array)) {
+      return push("synth", false, "E_TTS", { reason: "data-not-buffer", type: typeof bytes });
+    }
+    var u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    var head = String.fromCharCode(u8[0], u8[1], u8[2], u8[3]);
+    var copy = u8.slice(0, Math.min(u8.length, 12 * 1024 * 1024));
+    var stats = await decodeStats(copy.buffer.slice(0));
+    var ok = u8.length > 44 && head === "RIFF" && stats.supported !== false && stats.nonSilent === true;
+    originalAudio = u8;
+    return push("synth", ok, ok ? "OK" : "E_TTS", {
+      bytes: u8.length,
+      header: head,
+      durationSec: stats.durationSec || null,
+      sampleRate: stats.sampleRate || null,
+      channels: stats.channels || null,
+      nonSilent: stats.nonSilent === true,
+      peak: stats.peak || null
+    });
+  }
+
+  async function synthesizeOne(text) {
+    var res = await window.AIM.tts.synthesize({
+      text: text,
+      provider: wantProvider,
+      pluginId: wantPluginId,
+      options: { model: wantModel, voiceName: wantVoice, catalogPath: wantCatalog },
+      returnBuffer: true
+    });
+    if (!res || res.success !== true || res.data === undefined || res.data === null) {
+      return { ok: false, code: "E_TTS", detail: { shape: shape(res), keys: keysOf(res), hasData: !!(res && res.data) } };
+    }
+    var data = res.data;
+    var u8 = null;
+    if (data instanceof Uint8Array) u8 = data;
+    else if (data instanceof ArrayBuffer) u8 = new Uint8Array(data);
+    else if (typeof data === "string" && data.length > 0) {
+      try { var bin = atob(data); u8 = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i += 1) u8[i] = bin.charCodeAt(i); } catch (e) { u8 = null; }
+    }
+    if (!u8 || u8.length < 45) {
+      return { ok: false, code: "E_TTS", detail: { reason: "unsupported-audio-shape", type: typeof data } };
+    }
+    var head = String.fromCharCode(u8[0], u8[1], u8[2], u8[3]);
+    var stats = await decodeStats(u8.slice(0, Math.min(u8.length, 12 * 1024 * 1024)).buffer.slice(0));
+    var ok = head === "RIFF" && stats.supported !== false && stats.nonSilent === true;
+    return { ok: ok, code: ok ? "OK" : "E_TTS", u8: u8, detail: {
+      bytes: u8.length, header: head, durationSec: stats.durationSec || null,
+      sampleRate: stats.sampleRate || null, channels: stats.channels || null,
+      nonSilent: stats.nonSilent === true, peak: stats.peak || null
+    } };
+  }
+
+  async function stepSynthesizeTranslation() {
+    if (!expected || !expected.translationText) return push("synth-translation", false, "E_CONTEXT", { reason: "no expected translation" });
+    var out = await synthesizeOne(expected.translationText);
+    if (out.ok) translationAudio = out.u8;
+    return push("synth-translation", out.ok, out.code, out.detail);
+  }
+
+  function playBlob(u8, maxMs) {
+    return new Promise(function (resolve) {
+      var started = false;
+      var ended = false;
+      var blob = new Blob([u8], { type: "audio/wav" });
+      var url = URL.createObjectURL(blob);
+      var audio = new Audio(url);
+      var timer = setTimeout(function () {
+        try { audio.pause(); } catch (e) {}
+        URL.revokeObjectURL(url);
+        resolve({ started: started, ended: ended, timedOut: !ended });
+      }, maxMs);
+      audio.onplaying = function () { started = true; };
+      audio.onended = function () { ended = true; clearTimeout(timer); URL.revokeObjectURL(url); resolve({ started: started, ended: true, timedOut: false }); };
+      audio.onerror = function () { clearTimeout(timer); URL.revokeObjectURL(url); resolve({ started: started, ended: false, error: true }); };
+      try { audio.play(); } catch (e) { clearTimeout(timer); URL.revokeObjectURL(url); resolve({ started: false, ended: false, error: true }); }
+    });
+  }
+
+  async function stepPlay() {
+    if (!translationAudio) return push("play", false, "E_TTS", { reason: "no translation audio" });
+    var res = await playBlob(translationAudio, 15000);
+    return push("play", res.started === true && res.error !== true, res.error ? "E_TTS" : "OK", {
+      started: res.started === true, ended: res.ended === true, timedOut: res.timedOut === true
+    });
+  }
+
+  async function stepSave() {
+    if (!originalAudio) return push("save", false, "E_BRIDGE", { reason: "no audio to save" });
+    var saved = 0;
+    async function saveOne(name, u8) {
+      if (!u8) return false;
+      var arr = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+      var res = await window.AIM.file.savePluginFile({ filename: name, data: arr, isBase64: false });
+      return !!res;
+    }
+    if (await saveOne("voice-feasibility-original.wav", originalAudio)) saved += 1;
+    if (await saveOne("voice-feasibility-translation.wav", translationAudio)) saved += 1;
+    return push("save", saved === 2, saved === 2 ? "OK" : "E_BRIDGE", { saved: saved });
+  }
+
+  async function stepExtract() {
+    if (!expected || !expected.mediaSha256) return push("extract", false, "E_CONTEXT", { reason: "no pinned media" });
+    var body = {
+      noteId: noteId,
+      workspaceId: workspaceId,
+      folderId: folderId,
+      mediaId: mediaId,
+      segmentIds: (expected.timeline || []).map(function (s) { return s.id; })
+    };
+    var res = await probeFetch("/probe/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    var out = await res.json().catch(function () { return null; });
+    if (!res.ok || !out || out.ok !== true) {
+      return push("extract", false, out && out.code ? out.code : "E_MEDIA", { status: res.status, detail: out && out.detail ? out.detail : null });
+    }
+    return push("extract", true, "OK", {
+      bytes: out.bytes,
+      durationSec: out.durationSec,
+      sha256: out.sha256,
+      pcmSha256: out.pcmSha256,
+      mediaSha256Match: out.mediaSha256Match,
+      nonSilent: out.nonSilent
+    });
+  }
+
+  async function stepReport() {
+    var res = await probeFetch("/probe/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        runId: runIdSeen || runId,
+        noteIdPresent: !!noteId,
+        provenance: { nonce: nonce, runId: runIdSeen, sessionId: sessionId, port: corePort },
+        records: records
+      })
+    });
+    return push("report", res.ok, res.ok ? "OK" : "E_CONTEXT", { status: res.status });
+  }
+
+  async function main() {
+    try {
+      await stepSession();
+      if (token) { await stepExpected(); }
+      if (token && expected) {
+        await stepDetail();
+        await stepProviders();
+        await stepSynthesize();
+        await stepSynthesizeTranslation();
+        await stepPlay();
+        await stepSave();
+        await stepExtract();
+      }
+    } catch (err) {
+      push("fatal", false, "E_BRIDGE", { name: err && err.name ? err.name : "Error", message: err && err.message ? err.message : String(err) });
+    } finally {
+      if (token) { try { await stepReport(); } catch (e) {} }
+    }
+  }
+
+  main();
+})();
+</script>
+</body>
+</html>

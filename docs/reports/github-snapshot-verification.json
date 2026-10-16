@@ -1,0 +1,332 @@
+{
+  "checkedAt": "2026-10-16T03:47:36.303Z",
+  "nodeVersion": "v22.22.2",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "tests": {
+    "command": "npm test",
+    "exitCode": 0,
+    "total": 419,
+    "passed": 419,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "todo": 0,
+    "rawLogSha256": "dac40ca02d97ce87fc92ec7c4f099bb6e0efbec0819fe68e506aefd7d91a0d67",
+    "rawLogPublished": false,
+    "scope": "当前本机环境自动化；不证明采集App的原生A/B流程、真人音色或人工听感"
+  },
+  "builds": {
+    "ttsExitCode": 0,
+    "appExitCode": 0,
+    "priorAttempt": {
+      "ttsExitCode": 2,
+      "reason": "输出目录经由 /tmp 符号链接，被既有路径保护拒绝；改用规范路径后重跑"
+    },
+    "artifacts": [
+      {
+        "kind": "tts",
+        "name": "memo-plugin-tts-gptsovits-2.0.0.memox",
+        "bytes": 26877,
+        "sha256": "bee42ba33395573f8f022305c2bedf3b8a17a8ffa74f6b7779824de2b197db5d"
+      },
+      {
+        "kind": "app",
+        "name": "memo-plugin-app-voice-feasibility-0.1.1.memox",
+        "bytes": 5573,
+        "sha256": "1111d6617eb24c2327dabb1b742899d20c271caea0d7a202010ab17dc8ce89c3"
+      }
+    ]
+  },
+  "capabilityStatus": {
+    "existingVoiceAudio8": "historical-native-synthesis-evidence-human-listening-incomplete",
+    "captureA1": "NOT_RUN",
+    "captureA2": "NOT_RUN",
+    "captureA3": "NOT_RUN",
+    "newVoiceB": "NOT_RUN",
+    "gptSovits": "unverified-fail-closed",
+    "fullProductAccepted": false
+  },
+  "sourceInputs": [
+    {
+      "path": "LICENSE",
+      "sha256": "06e241bc7bdee042cd6c3c363758de44cc93db596adbabd06d19bb795c01cafa"
+    },
+    {
+      "path": "apps/voice-feasibility/index.html",
+      "sha256": "b6cc12bd236751bfc1137e465f90f263ee7428458d90e4b1ee1c39cab3ff670d"
+    },
+    {
+      "path": "apps/voice-feasibility/index.js",
+      "sha256": "1a0de0da9fa207f5a1b854ead72999bcbfaa721b4aa400284b647700871c9061"
+    },
+    {
+      "path": "apps/voice-feasibility/manifest.json",
+      "sha256": "e7a4919a7b33d0d74a2dc8451c09287bd184dba1cf94786dc57b3b4babac6716"
+    },
+    {
+      "path": "i18n.json",
+      "sha256": "d0d52c6700cdb1f6c5ccf1b9097bb58de77bacdcdf0c3504fbb38fa2f052f791"
+    },
+    {
+      "path": "icon.svg",
+      "sha256": "a994b1c806af0b1c6239011c5d2dfcce72e5f5235dad0c02c76f2d05d4631414"
+    },
+    {
+      "path": "index.js",
+      "sha256": "3a3c7b3fe66a92458c4615546c3653beda0ff954da205c75c08fd25de4bc87b0"
+    },
+    {
+      "path": "manager/index.js",
+      "sha256": "110e8c81eb1ca7802fce36fbffc8471f9650b7806463950b20abc7c86b02f635"
+    },
+    {
+      "path": "manager/server.js",
+      "sha256": "d0fd78391eef7d35ad14634f43c9d8a5b5d745ce70877dc5ec18721261446171"
+    },
+    {
+      "path": "manager/store.js",
+      "sha256": "952572864bbfa21ada6a1ecaf84c03260facd4c4601609a20c9d3d73003faf3a"
+    },
+    {
+      "path": "manager/ui/app.js",
+      "sha256": "fc6e6a88df0bb4ca4b53786d9b8fe657905711ab9b2018193157ebba7cf7e8c5"
+    },
+    {
+      "path": "manager/ui/index.html",
+      "sha256": "b158f45e5c389ae5237db25af6884f10eecf32acf5a2b1123836c36b7aa1d830"
+    },
+    {
+      "path": "manager/ui/style.css",
+      "sha256": "26e44f2498ffbf5b24c1ef1caf0c1c653cf949cae8cfae2d50d82b7000e87d40"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "546147a165d6a602d828503e8e06aaf7ad9e49ddf1f027ebeaca64d8ad05363b"
+    },
+    {
+      "path": "options.json",
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    {
+      "path": "package.json",
+      "sha256": "4805b4c14caae5364f7e5ea8caabb5dfe5398f593ce529163c15d0e88ca932fe"
+    },
+    {
+      "path": "scripts/audio8-service.py",
+      "sha256": "d682cb4443833b912256130aab2dc97fc85db2d330b94ec28035daf6de47b24f"
+    },
+    {
+      "path": "scripts/build-memox.sh",
+      "sha256": "0403cb03c84b078ef5ca49b8bc9eff1edff68eb6c8df513849383addfa7322e4"
+    },
+    {
+      "path": "scripts/build-runtime.js",
+      "sha256": "0a9720dbffc10ba3634b68fffeffb232e453f5d02a5b9050d1088f8ec52e4d33"
+    },
+    {
+      "path": "scripts/install-local.sh",
+      "sha256": "4c4ba623ab764729ee41ab3abe5bf02e09a38ac87668888f7c4ed7f6c914a286"
+    },
+    {
+      "path": "scripts/smoke-local.js",
+      "sha256": "6a714133c915c35ad5e32724c665794d4692bb4b494934c6b61aba7402585fb6"
+    },
+    {
+      "path": "scripts/verify-local.sh",
+      "sha256": "56465e8516892c79de9cae9c12d912421420dddfc9d4674ff2a0940e8c008270"
+    },
+    {
+      "path": "scripts/voice-capture/cli.js",
+      "sha256": "69277935db8ff2870ff9a2caa5a604aa8b24a1c3f60aa1976cd4afd36778977b"
+    },
+    {
+      "path": "scripts/voice-capture/core.js",
+      "sha256": "1fb4ac98f7d0b23caee02e3e6dd265c54d800299c435a0f520adff8a52d7c9cd"
+    },
+    {
+      "path": "scripts/voice-capture/fixture.js",
+      "sha256": "a6cc3527d7affe23c3ae7f75e0d408b86964a34bcf49ae62871d132affa2524b"
+    },
+    {
+      "path": "scripts/voice-capture/judge.js",
+      "sha256": "d0f134117f227adee84be406dd3fa820c0227f6d40315aed5bb85589f7bc32ed"
+    },
+    {
+      "path": "scripts/voice-capture/pack-app.js",
+      "sha256": "e6b6a47674c587848f6bcaebc43bf2bf907e064dec5b3370f3a3781a0dff857f"
+    },
+    {
+      "path": "src/backends/audio8.js",
+      "sha256": "69f4c3b104d876ac13b71e952304b83a8751f832e12c3638e2ce7fb52f66682b"
+    },
+    {
+      "path": "src/backends/gpt-sovits.js",
+      "sha256": "f2509a03644fb09ce3a1a6721da1e7c0440b02a6bffccab92486430a75b8c35c"
+    },
+    {
+      "path": "src/backends/index.js",
+      "sha256": "d73d6c127ff54ae06b10e1c49e6e323719185379b9d27ebe38a65df728987a85"
+    },
+    {
+      "path": "src/catalog.js",
+      "sha256": "4c5359c78d3d1e75647021b23b1f7e896a479bdb111fa49b6d3be538e6304639"
+    },
+    {
+      "path": "src/http-client.js",
+      "sha256": "438f32978c46d5144d716a6115073c09276397eb7bedbd6c9ffeb52f3ea8a513"
+    },
+    {
+      "path": "src/plugin.js",
+      "sha256": "1ebcd63e7264d968df0856f3f6a0e94e168affe555e6e8238211b2abc7c98b32"
+    },
+    {
+      "path": "src/text.js",
+      "sha256": "4b8e9d73229396fc10c7b0c6cb2b9f6dc21e9fc7015e643928e1afbf1fe1148f"
+    },
+    {
+      "path": "src/voice-value.js",
+      "sha256": "5bc72429dbeaaf704d279ba1aed954ca1aea007e01a1d8a38a6dc0ff40a3d49a"
+    },
+    {
+      "path": "src/wav.js",
+      "sha256": "715bb5d4bd22591b3b0949fe5e8cf8dd353aabf7a1406c6dba761efc0b999e5a"
+    },
+    {
+      "path": "test/audio.test.js",
+      "sha256": "512c8e84609725dcb96e9e363d24916b5adda36a16536ee1551bbe6ddd082a2f"
+    },
+    {
+      "path": "test/audio8-backend.test.js",
+      "sha256": "b873119c1ef9a2f3b35bb48f21b4211ed07bf7556c3b3b8815f0810725360bba"
+    },
+    {
+      "path": "test/audio8-service.test.js",
+      "sha256": "03695ca3242f87be8043a176d9af3335445890ee73150779887324986f367840"
+    },
+    {
+      "path": "test/backend-registry.test.js",
+      "sha256": "c26603273259ae98f25451c0a44ee3e5fe67de3b097f0c70b94fef027c5a9d40"
+    },
+    {
+      "path": "test/build-runtime.test.js",
+      "sha256": "82c3f2071326abacfc24d04c7f15dcf4267aef12c2103109b88109133ccee7ee"
+    },
+    {
+      "path": "test/catalog.test.js",
+      "sha256": "7526f774160cbd9972e07e31dc3bdc076817b94bba3884d7750268bb7f37ab7e"
+    },
+    {
+      "path": "test/editor-options.test.js",
+      "sha256": "0b693334f76eadc1b34844bc74ee58150257a5403c0b1f7f050446421017a627"
+    },
+    {
+      "path": "test/gpt-sovits-backend.test.js",
+      "sha256": "b3b5785e5de1e9de8946e636a68299d369b59fc83daddd75d0560644154722df"
+    },
+    {
+      "path": "test/helpers/audio8-fixture.js",
+      "sha256": "51ab305cc5f7b2eb9f269831ec2adcbe9794bb4efdd5597a35e57d4b96669ac3"
+    },
+    {
+      "path": "test/helpers/catalog-fixture.js",
+      "sha256": "b5f931cb6b5009405321fd78f891f6d5ce4272dd4f0c2046b81837f30e059831"
+    },
+    {
+      "path": "test/helpers/gpt-sovits-fixture.js",
+      "sha256": "2935aadac1c5e8e84f53d8a8aef5adecd7c7a870e146d558c7f7519c0ee9e6d0"
+    },
+    {
+      "path": "test/helpers/plugin-fixture.js",
+      "sha256": "05b3e0710b753730e38f744595388ba9d665c8bdfc540d3577dc02d49dba8b2b"
+    },
+    {
+      "path": "test/helpers/server-fixture.js",
+      "sha256": "9660772be18c3ae9253607e8c358ff1a2e4b4caf66d4535edc01a23ff237c6d4"
+    },
+    {
+      "path": "test/helpers/wav-fixture.js",
+      "sha256": "82870539eac09c9962edb30c9a6a33014195d8f26e622567f8ecde282fc1a639"
+    },
+    {
+      "path": "test/http-client.test.js",
+      "sha256": "eaf84419ea28bbba1669cb51316883f4344d71d71b91822c3aaa0c4d52f168c0"
+    },
+    {
+      "path": "test/install-local.test.js",
+      "sha256": "704e62a473bb5723c10c121185cb940325f83c986365113a74cce645e817e948"
+    },
+    {
+      "path": "test/manifest.test.js",
+      "sha256": "0e59ceb0d8e9930067a236960058a51a4c517e6732b3ff54ed7316c8befa5fe5"
+    },
+    {
+      "path": "test/memox-package.test.js",
+      "sha256": "03bc9a88f03f370483e181a5217b3fd9dbb306b8d09538c7f0cc6f211efed481"
+    },
+    {
+      "path": "test/plugin-contract.test.js",
+      "sha256": "50b6f9b15247f7e9038070dba09ee9412a1a225185d0d0e0a00752602d104f33"
+    },
+    {
+      "path": "test/plugin-runtime.test.js",
+      "sha256": "6c61939ca040e7d490288db1d5d62dfa312904cdff817415b5fef2da8895c00e"
+    },
+    {
+      "path": "test/smoke-local.test.js",
+      "sha256": "6b35d6517c150d8b120b37e6e4e5ae46eb62ce3da18c67e187115b501cdd08dc"
+    },
+    {
+      "path": "test/text.test.js",
+      "sha256": "1ec70f292c6a37e8950d1686c2068504e6ed424b0d10ffc68cc08e8fa493347a"
+    },
+    {
+      "path": "test/voice-capture-core.test.js",
+      "sha256": "02bfa1815aa9e10fd0887ba9c34e6969d74cf33b47a464031ae4c58827cacb9b"
+    },
+    {
+      "path": "test/voice-capture-fixture.test.js",
+      "sha256": "1f557505f43ad0f85ccd499f3a5016b7afaa173ff9a6804c1c6f61d8e3d1f51c"
+    },
+    {
+      "path": "test/voice-manager-cli.test.js",
+      "sha256": "266da9a3d8b8c425bac1096f3e65367cf100ed78c7e327164414345cb6bbad29"
+    },
+    {
+      "path": "test/voice-manager-import.test.js",
+      "sha256": "5ee865aa66c96a10bd10916dff71b131feeea93a9b7a7b280ac3f465e10de60a"
+    },
+    {
+      "path": "test/voice-manager-lifecycle.test.js",
+      "sha256": "d9a7a91fef16634138773cdeb156c273b1a623000949eecb43d128fd41b7d15e"
+    },
+    {
+      "path": "test/voice-manager-prepare.test.js",
+      "sha256": "a6961828f0f11ef76ccc6e15bc29da58fca600cbec65b6895fccc6e5afd75b86"
+    },
+    {
+      "path": "test/voice-manager-server.test.js",
+      "sha256": "d37af851f5cffd8ca07cff341f2b33f16eff39a078cbcd2e9a0a02650ed3dacd"
+    },
+    {
+      "path": "test/voice-manager-store.test.js",
+      "sha256": "7033c0a99994d6416745b6ac11cecc3bace5db279f056b5674441c338aa851c1"
+    },
+    {
+      "path": "test/voice-manager-transactions.test.js",
+      "sha256": "5981b368ddd80338ddf1cc22988a77b775498418de628b9cb25956d02fb70c04"
+    },
+    {
+      "path": "test/voice-manager-ui.test.js",
+      "sha256": "80ec9528ac6619df438bcc707c140eda2939f26f1ff25452751af327ad5f6c44"
+    },
+    {
+      "path": "test/voice-value.test.js",
+      "sha256": "4714d1d23a3abf64960bdd209f83447e1b1c119127187511caf3436a97f81f74"
+    },
+    {
+      "path": "test/wav.test.js",
+      "sha256": "9a500d9872ee37ebe9a84a38bb510e8c03d206d3a49f9975e80a2db758661eb2"
+    }
+  ]
+}
