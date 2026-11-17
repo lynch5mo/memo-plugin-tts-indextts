@@ -1,0 +1,118 @@
+{
+  "$schema": "../../../../core/schemas/manifest.schema.json",
+  "manifestVersion": "1",
+  "pluginId": "memo-plugin-tts-indextts",
+  "version": "1.2.7",
+  "title": "IndexTTS TTS",
+  "description": "本地 IndexTTS 2.5 语音克隆配音：按字幕槽位精确对齐时长，音色可从视频自动采集",
+  "type": "tts",
+  "platforms": [
+    "darwin"
+  ],
+  "arch": [
+    "arm64",
+    "x86_64"
+  ],
+  "importType": "commonjs",
+  "provider": {
+    "value": "IndexTTS TTS",
+    "label": "IndexTTS TTS"
+  },
+  "configuration": [
+    {
+      "label": "API 地址",
+      "key": "baseUrl",
+      "type": "text"
+    },
+    {
+      "label": "音色（auto 自动采集）",
+      "key": "voice",
+      "type": "text",
+      "default": "auto"
+    },
+    {
+      "label": "语言",
+      "key": "language",
+      "type": "select",
+      "options": [
+        {
+          "value": "ZH",
+          "label": "中文（普通话）"
+        },
+        {
+          "value": "EN",
+          "label": "英语"
+        },
+        {
+          "value": "JA",
+          "label": "日语"
+        }
+      ]
+    },
+    {
+      "label": "语速",
+      "key": "speed",
+      "type": "slider",
+      "range": {
+        "min": 0.5,
+        "max": 2.0,
+        "step": 0.05
+      }
+    }
+  ],
+  "defaultsConfiguration": {
+    "baseUrl": "http://127.0.0.1:7861",
+    "voice": "auto",
+    "language": "ZH",
+    "speed": 1.0
+  },
+  "configurationExposed": [
+    "voice",
+    "language",
+    "speed"
+  ],
+  "ttsInput": [
+    "voice",
+    "language",
+    "speed"
+  ],
+  "storageKey": "indextts",
+  "configurationStorage": [
+    "voice",
+    "language",
+    "speed"
+  ],
+  "configurationRequired": [
+    "baseUrl",
+    "voice"
+  ],
+  "version_name": "stable",
+  "author": "lynch5mo",
+  "memoTtsEditor": {
+    "fields": {
+      "voice": {
+        "role": "voice",
+        "scope": [
+          "global",
+          "card",
+          "segment"
+        ]
+      },
+      "speed": {
+        "role": "speed",
+        "scope": [
+          "global",
+          "card",
+          "segment"
+        ]
+      },
+      "language": {
+        "role": "language",
+        "scope": [
+          "global",
+          "card"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+# IndexTTS 2.5 本体按官方仓库安装（含 torch 与权重），这里只列 API 封装额外依赖
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+imageio-ffmpeg>=0.4

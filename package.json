@@ -1,11 +1,11 @@
 {
-  "name": "memo-plugin-tts-gptsovits",
-  "version": "1.0.0",
-  "description": "Phase 0 GPT-SoVITS TTS provider for Memo with a deterministic local .memox builder",
+  "name": "memo-plugin-tts-indextts",
+  "version": "1.2.7",
+  "description": "Memo TTS provider for a self-hosted IndexTTS 2.5 server",
   "license": "MIT",
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "pack": "bash scripts/pack.sh"
   }
 }

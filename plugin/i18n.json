@@ -1,0 +1,23 @@
+{
+  "en": {
+    "IndexTTS TTS": "IndexTTS TTS",
+    "API 地址": "API base URL",
+    "音色": "Voice",
+    "语言": "Language",
+    "语速": "Speed"
+  },
+  "zh": {
+    "IndexTTS TTS": "IndexTTS 语音合成",
+    "API 地址": "API 地址",
+    "音色": "音色",
+    "语言": "语言",
+    "语速": "语速"
+  },
+  "zh_tw": {
+    "IndexTTS TTS": "IndexTTS 語音合成",
+    "API 地址": "API 位址",
+    "音色": "音色",
+    "语言": "語言",
+    "语速": "語速"
+  }
+}
